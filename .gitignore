@@ -1,0 +1,72 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions and build artifacts
+*.so
+*.pyd
+*.dll
+*.dylib
+*.o
+*.obj
+*.exe
+*.ilk
+*.pdb
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+wheels/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# PyBind11 / setuptools build directories
+*.egg-info/
+*.egg
+*.wheel
+build/
+
+# Tests
+.pytest_cache/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Coverage
+.coverage
+htmlcov/
+.coverage.*
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+
+# Temporary files
+*.tmp
+*.temp
+
+# CMake artifacts (if any)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+vec_report.txt
