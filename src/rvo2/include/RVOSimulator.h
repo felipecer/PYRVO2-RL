@@ -44,7 +44,8 @@
 
 #include "Vector2.h"
 
-namespace RVO {
+namespace RVO
+{
 	/**
 	 * \brief       Error value.
 	 *
@@ -56,7 +57,8 @@ namespace RVO {
 	/**
 	 * \brief      Defines a directed line.
 	 */
-	class Line {
+	class Line
+	{
 	public:
 		/**
 		 * \brief     A point on the directed line.
@@ -78,7 +80,21 @@ namespace RVO {
 	 *
 	 * The main class of the library that contains all simulation functionality.
 	 */
-	class RVOSimulator {
+	class RVOSimulator
+	{
+	private:
+		std::vector<Agent *> agents_;
+		Agent *defaultAgent_;
+		float globalTime_;
+		KdTree *kdTree_;
+		std::vector<Obstacle *> obstacles_;
+		float timeStep_;
+
+		friend class Agent;
+		friend class KdTree;
+		friend class Obstacle;
+		friend class RL_EXTENSIONS::RVO2_RL_Wrapper;
+
 	public:
 		/**
 		 * \brief      Constructs a simulator instance.
@@ -127,8 +143,8 @@ namespace RVO {
 		 *                             velocity of a new agent (optional).
 		 */
 		RVOSimulator(float timeStep, float neighborDist, size_t maxNeighbors,
-					 float timeHorizon, float timeHorizonObst, float radius,
-					 float maxSpeed, const Vector2 &velocity = Vector2());
+								 float timeHorizon, float timeHorizonObst, float radius,
+								 float maxSpeed, const Vector2 &velocity = Vector2());
 
 		/**
 		 * \brief      Destroys this simulator instance.
@@ -187,9 +203,9 @@ namespace RVO {
 		 * \return     The number of the agent.
 		 */
 		size_t addAgent(const Vector2 &position, float neighborDist,
-						size_t maxNeighbors, float timeHorizon,
-						float timeHorizonObst, float radius, float maxSpeed,
-						const Vector2 &velocity = Vector2());
+										size_t maxNeighbors, float timeHorizon,
+										float timeHorizonObst, float radius, float maxSpeed,
+										const Vector2 &velocity = Vector2());
 
 		/**
 		 * \brief      Adds a new obstacle to the simulation.
@@ -265,7 +281,6 @@ namespace RVO {
 		 *             compute the current velocity for the specified agent.
 		 */
 		size_t getAgentNumObstacleNeighbors(size_t agentNo) const;
-
 
 		/**
 		 * \brief      Returns the count of ORCA constraints used to compute
@@ -436,7 +451,7 @@ namespace RVO {
 		 *             processed.
 		 */
 		bool queryVisibility(const Vector2 &point1, const Vector2 &point2,
-							 float radius = 0.0f) const;
+												 float radius = 0.0f) const;
 
 		/**
 		 * \brief      Sets the default properties for any new agent that is
@@ -478,9 +493,9 @@ namespace RVO {
 		 *                             velocity of a new agent (optional).
 		 */
 		void setAgentDefaults(float neighborDist, size_t maxNeighbors,
-							  float timeHorizon, float timeHorizonObst,
-							  float radius, float maxSpeed,
-							  const Vector2 &velocity = Vector2());
+													float timeHorizon, float timeHorizonObst,
+													float radius, float maxSpeed,
+													const Vector2 &velocity = Vector2());
 
 		/**
 		 * \brief      Sets the maximum neighbor count of a specified agent.
@@ -574,18 +589,6 @@ namespace RVO {
 		 *                             Must be positive.
 		 */
 		void setTimeStep(float timeStep);
-
-	private:
-		std::vector<Agent *> agents_;
-		Agent *defaultAgent_;
-		float globalTime_;
-		KdTree *kdTree_;
-		std::vector<Obstacle *> obstacles_;
-		float timeStep_;
-
-		friend class Agent;
-		friend class KdTree;
-		friend class Obstacle;
 	};
 }
 

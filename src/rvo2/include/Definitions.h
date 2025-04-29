@@ -51,7 +51,14 @@
  */
 const float RVO_EPSILON = 0.00001f;
 
-namespace RVO {
+namespace RL_EXTENSIONS
+{
+	enum class ObsMode;
+	class RVO2_RL_Wrapper;
+}
+
+namespace RVO
+{
 	class Agent;
 	class Obstacle;
 	class RVOSimulator;
@@ -66,17 +73,20 @@ namespace RVO {
 	 * \return     The squared distance from the line segment to the point.
 	 */
 	inline float distSqPointLineSegment(const Vector2 &a, const Vector2 &b,
-										const Vector2 &c)
+																			const Vector2 &c)
 	{
 		const float r = ((c - a) * (b - a)) / absSq(b - a);
 
-		if (r < 0.0f) {
+		if (r < 0.0f)
+		{
 			return absSq(c - a);
 		}
-		else if (r > 1.0f) {
+		else if (r > 1.0f)
+		{
 			return absSq(c - b);
 		}
-		else {
+		else
+		{
 			return absSq(c - (a + r * (b - a)));
 		}
 	}

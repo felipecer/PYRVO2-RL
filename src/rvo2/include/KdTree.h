@@ -40,17 +40,20 @@
 
 #include "Definitions.h"
 
-namespace RVO {
+namespace RVO
+{
 	/**
 	 * \brief      Defines <i>k</i>d-trees for agents and static obstacles in the
 	 *             simulation.
 	 */
-	class KdTree {
+	class KdTree
+	{
 	private:
 		/**
 		 * \brief      Defines an agent <i>k</i>d-tree node.
 		 */
-		class AgentTreeNode {
+		class AgentTreeNode
+		{
 		public:
 			/**
 			 * \brief      The beginning node number.
@@ -96,7 +99,8 @@ namespace RVO {
 		/**
 		 * \brief      Defines an obstacle <i>k</i>d-tree node.
 		 */
-		class ObstacleTreeNode {
+		class ObstacleTreeNode
+		{
 		public:
 			/**
 			 * \brief      The left obstacle tree node.
@@ -138,7 +142,7 @@ namespace RVO {
 		void buildObstacleTree();
 
 		ObstacleTreeNode *buildObstacleTreeRecursive(const std::vector<Obstacle *> &
-													 obstacles);
+																										 obstacles);
 
 		/**
 		 * \brief      Computes the agent neighbors of the specified agent.
@@ -164,10 +168,10 @@ namespace RVO {
 		void deleteObstacleTree(ObstacleTreeNode *node);
 
 		void queryAgentTreeRecursive(Agent *agent, float &rangeSq,
-									 size_t node) const;
+																 size_t node) const;
 
 		void queryObstacleTreeRecursive(Agent *agent, float rangeSq,
-										const ObstacleTreeNode *node) const;
+																		const ObstacleTreeNode *node) const;
 
 		/**
 		 * \brief      Queries the visibility between two points within a
@@ -182,11 +186,11 @@ namespace RVO {
 		 *             false otherwise.
 		 */
 		bool queryVisibility(const Vector2 &q1, const Vector2 &q2,
-							 float radius) const;
+												 float radius) const;
 
 		bool queryVisibilityRecursive(const Vector2 &q1, const Vector2 &q2,
-									  float radius,
-									  const ObstacleTreeNode *node) const;
+																	float radius,
+																	const ObstacleTreeNode *node) const;
 
 		std::vector<Agent *> agents_;
 		std::vector<AgentTreeNode> agentTree_;
@@ -197,6 +201,7 @@ namespace RVO {
 
 		friend class Agent;
 		friend class RVOSimulator;
+		friend class RL_EXTENSIONS::RVO2_RL_Wrapper;
 	};
 }
 

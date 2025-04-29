@@ -41,11 +41,13 @@
 #include "Definitions.h"
 #include "RVOSimulator.h"
 
-namespace RVO {
+namespace RVO
+{
 	/**
 	 * \brief      Defines an agent in the simulation.
 	 */
-	class Agent {
+	class Agent
+	{
 	private:
 		/**
 		 * \brief      Constructs an agent instance.
@@ -86,12 +88,12 @@ namespace RVO {
 		 */
 		void update();
 
-		std::vector<std::pair<float, const Agent *> > agentNeighbors_;
+		std::vector<std::pair<float, const Agent *>> agentNeighbors_;
 		size_t maxNeighbors_;
 		float maxSpeed_;
 		float neighborDist_;
 		Vector2 newVelocity_;
-		std::vector<std::pair<float, const Obstacle *> > obstacleNeighbors_;
+		std::vector<std::pair<float, const Obstacle *>> obstacleNeighbors_;
 		std::vector<Line> orcaLines_;
 		Vector2 position_;
 		Vector2 prefVelocity_;
@@ -105,6 +107,7 @@ namespace RVO {
 
 		friend class KdTree;
 		friend class RVOSimulator;
+		friend class RL_EXTENSIONS::RVO2_RL_Wrapper;
 	};
 
 	/**
@@ -121,8 +124,8 @@ namespace RVO {
 	 * \return     True if successful.
 	 */
 	bool linearProgram1(const std::vector<Line> &lines, size_t lineNo,
-						float radius, const Vector2 &optVelocity,
-						bool directionOpt, Vector2 &result);
+											float radius, const Vector2 &optVelocity,
+											bool directionOpt, Vector2 &result);
 
 	/**
 	 * \relates    Agent
@@ -136,8 +139,8 @@ namespace RVO {
 	 * \return     The number of the line it fails on, and the number of lines if successful.
 	 */
 	size_t linearProgram2(const std::vector<Line> &lines, float radius,
-						  const Vector2 &optVelocity, bool directionOpt,
-						  Vector2 &result);
+												const Vector2 &optVelocity, bool directionOpt,
+												Vector2 &result);
 
 	/**
 	 * \relates    Agent
@@ -150,7 +153,7 @@ namespace RVO {
 	 * \param      result        A reference to the result of the linear program.
 	 */
 	void linearProgram3(const std::vector<Line> &lines, size_t numObstLines, size_t beginLine,
-						float radius, Vector2 &result);
+											float radius, Vector2 &result);
 }
 
 #endif /* RVO_AGENT_H_ */
