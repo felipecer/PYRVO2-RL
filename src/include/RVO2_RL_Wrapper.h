@@ -27,6 +27,7 @@ namespace RL_EXTENSIONS
     std::vector<float> agent_pos_vector_y_;
     std::vector<float> dist_to_goal_vector_x_;
     std::vector<float> dist_to_goal_vector_y_;
+    std::size_t maxNeighbors_;
     bool useLidar_;
     std::size_t lidarCount_;
     float lidarRange_;
@@ -58,7 +59,7 @@ namespace RL_EXTENSIONS
         float lidarRange = 18.0f);
     RVO::RVOSimulator &getSimulator();
     const RVO::RVOSimulator &getSimulator() const;
-
+    pybind11::dict get_observation_bounds() const;  
     ~RVO2_RL_Wrapper();
     pybind11::array_t<float> get_neighbors(int agent_id) const;
     pybind11::array_t<float> get_lidar(int agent_id) const;

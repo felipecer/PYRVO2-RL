@@ -9,6 +9,22 @@ namespace py = pybind11;
 void bind_wrapper_observation(py::class_<W> &cls)
 {
     cls
+        .def("get_observation_bounds", &RL_EXTENSIONS::RVO2_RL_Wrapper::get_observation_bounds,
+                    R"doc(
+            Return a dict with the following entries:
+            
+                - mode:       "cartesian" or "polar"
+                - low:        NumPy array of per-dim lower bounds
+                - high:       NumPy array of per-dim upper bounds
+                - info:       list of human-readable strings describing each slice
+            
+            The layout matches exactly the flattened observation vector:
+            [ step,
+                agent_x, agent_y,
+                (LIDAR: angles, ranges[, mask]),
+                (neighbors: cartesian or polar),
+                (neighbor mask?) ]
+            )doc")
         .def("get_neighbors", &RL_EXTENSIONS::RVO2_RL_Wrapper::get_neighbors,
              py::arg("agent_id"),
              R"doc(

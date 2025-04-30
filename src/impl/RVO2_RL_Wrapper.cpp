@@ -1,6 +1,11 @@
 #include "RVO2_RL_Wrapper.h"
 #include <random>
 #include <cmath>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
+#include <sstream>
+using std::string;
+using std::vector;
 
 namespace RL_EXTENSIONS
 {
@@ -40,7 +45,7 @@ namespace RL_EXTENSIONS
                 radius,
                 maxSpeed,
                 velocity)},
-        mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}, useLidar_{useLidar}, lidarCount_{lidarCount}, lidarRange_{lidarRange}
+        mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}, useLidar_{useLidar}, lidarCount_{lidarCount}, lidarRange_{lidarRange}, maxNeighbors_{maxNeighbors}
   {
     std::size_t n = rvo_simulator_->getNumAgents(); // típicamente 0 en este punto
     goal_vector_x_.assign(n, 0.0f);
@@ -574,12 +579,119 @@ namespace RL_EXTENSIONS
       if (useObsMask_)
       {
         buf(i, 2) = float(mask[i]); // 1.0 = hit, 0.0 = miss
-      } else{
+      }
+      else
+      {
         buf(i, 1) = distances[i] * 3;
-      }      
+      }
     }
 
     return arr;
   }
 
+  pybind11::dict RVO2_RL_Wrapper::get_observation_bounds() const {
+    std::vector<float>       low, high;
+    std::vector<std::string> info;
+
+    // 1) step
+    low .push_back(0.0f);    high.push_back(1.0f);
+    info.push_back("[0] step ∈ [0,1]");
+
+    // 2) agent position
+    low .insert(low.end(),  { -1000.0f, -1000.0f });
+    high.insert(high.end(), {  1000.0f,  1000.0f });
+    info.push_back("[1:3] agent position x,y ∈ [-1000,1000]");
+
+    // 3) optional LIDAR
+    size_t idx = low.size();
+    if (useLidar_) {
+        // angles ∈ [-π,π)
+        low .insert(low.end(),  lidarCount_, -M_PI);
+        high.insert(high.end(), lidarCount_,  M_PI);
+        {
+            std::ostringstream oss;
+            oss << "[" << idx << ":" << (idx + lidarCount_)
+                << ") LIDAR angles ∈ [-π,π)";
+            info.push_back(oss.str());
+        }
+        idx += lidarCount_;
+
+        // normalized ranges ∈ [0,1]
+        low .insert(low.end(),  lidarCount_, 0.0f);
+        high.insert(high.end(), lidarCount_, 1.0f);
+        {
+            std::ostringstream oss;
+            oss << "[" << idx << ":" << (idx + lidarCount_)
+                << "] LIDAR normalized ranges ∈ [0,1]";
+            info.push_back(oss.str());
+        }
+        idx += lidarCount_;
+
+        if (useObsMask_) {
+            // hit-mask ∈ {0,1}
+            low .insert(low.end(),  lidarCount_, 0.0f);
+            high.insert(high.end(), lidarCount_, 1.0f);
+            std::ostringstream oss;
+            oss << "[" << idx << ":" << (idx + lidarCount_)
+                << "] LIDAR hit-mask ∈ {0,1}";
+            info.push_back(oss.str());
+            idx += lidarCount_;
+        }
+    }
+
+    // 4) neighbor block (Cartesian vs Polar)
+    size_t base = idx;
+    for (size_t i = 0; i < maxNeighbors_; ++i) {
+        // pos x,y
+        low .push_back(-1000.0f); high.push_back(1000.0f);
+        low .push_back(-1000.0f); high.push_back(1000.0f);
+        // velocity/mag
+        low .push_back(0.0f); high.push_back(1.0f);
+        if (mode_ == ObsMode::Cartesian) {
+            low .push_back(-1000.0f); high.push_back(1000.0f);
+        } else {
+            low .push_back(-M_PI);    high.push_back(M_PI);
+        }
+        // preferred velocity/mag
+        low .push_back(0.0f); high.push_back(1.0f);
+        if (mode_ == ObsMode::Cartesian) {
+            low .push_back(-1000.0f); high.push_back(1000.0f);
+        } else {
+            low .push_back(-M_PI);    high.push_back(M_PI);
+        }
+    }
+    {
+        std::ostringstream oss;
+        oss << "[" << base << ":" << (base + 6*maxNeighbors_)
+            << "] neighbors (" << maxNeighbors_ << "×"
+            << (mode_==ObsMode::Cartesian
+                  ? "pos_x,pos_y,vel_x,vel_y,pref_x,pref_y"
+                  : "pos_x,pos_y,vel_mag,vel_ang,pref_mag,pref_ang")
+            << ")";
+        info.push_back(oss.str());
+    }
+    idx = base + 6*maxNeighbors_;
+
+    // 5) neighbor mask
+    if (useObsMask_) {
+        low .insert(low.end(),  maxNeighbors_, 0.0f);
+        high.insert(high.end(), maxNeighbors_, 1.0f);
+        std::ostringstream oss;
+        oss << "[" << idx << ":" << (idx + maxNeighbors_)
+            << "] neighbor hit-mask ∈ {0,1}";
+        info.push_back(oss.str());
+    }
+
+    // wrap into NumPy arrays (no extra copy)
+    auto low_arr  = pybind11::array_t<float>(low.size(),  low.data());
+    auto high_arr = pybind11::array_t<float>(high.size(), high.data());
+
+    // return dict with mode, arrays, and human-readable info
+    pybind11::dict d;
+    d["mode"]  = (mode_==ObsMode::Cartesian ? "cartesian" : "polar");
+    d["low"]   = low_arr;
+    d["high"]  = high_arr;
+    d["info"]  = info;  // vector<string> → Python list[str]
+    return d;
+}  
 } // namespace RL_EXTENSIONS
