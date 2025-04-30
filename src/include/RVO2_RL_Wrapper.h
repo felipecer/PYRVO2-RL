@@ -27,6 +27,9 @@ namespace RL_EXTENSIONS
     std::vector<float> agent_pos_vector_y_;
     std::vector<float> dist_to_goal_vector_x_;
     std::vector<float> dist_to_goal_vector_y_;
+    bool useLidar_;
+    std::size_t lidarCount_;
+    float lidarRange_;
     std::unique_ptr<RVO::RVOSimulator> rvo_simulator_;
     ObsMode mode_;
     bool useObsMask_;
@@ -49,16 +52,19 @@ namespace RL_EXTENSIONS
         float maxSpeed = 2.0f,
         const RVO::Vector2 &velocity = RVO::Vector2(),
         ObsMode mode = ObsMode::Cartesian,
-        bool useObsMask = false);
+        bool useObsMask = false,
+        bool useLidar = false,
+        std::size_t lidarCount = 360,
+        float lidarRange = 18.0f);
     RVO::RVOSimulator &getSimulator();
     const RVO::RVOSimulator &getSimulator() const;
 
     ~RVO2_RL_Wrapper();
     pybind11::array_t<float> get_neighbors(int agent_id) const;
+    pybind11::array_t<float> get_lidar(int agent_id) const;
+    
 
-    void initRaycastingEngine(std::size_t count, float length);
-
-    float getRayLength() const;
+    float getLidarRange() const;
 
     std::vector<RVO::Vector2> getGoals() const;
     void setGoal(std::size_t agent_id, const RVO::Vector2 &goal);

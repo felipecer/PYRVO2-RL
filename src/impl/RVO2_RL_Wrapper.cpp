@@ -15,7 +15,7 @@ namespace RL_EXTENSIONS
   {
     return *rvo_simulator_;
   }
-  
+
   RVO2_RL_Wrapper::RVO2_RL_Wrapper(
       float timeStep,
       float neighborDist,
@@ -26,7 +26,10 @@ namespace RL_EXTENSIONS
       float maxSpeed,
       const RVO::Vector2 &velocity,
       ObsMode mode,
-      bool useObsMask)
+      bool useObsMask,
+      bool useLidar,
+      std::size_t lidarCount,
+      float lidarRange)
       : rvo_simulator_{
             std::make_unique<RVO::RVOSimulator>(
                 timeStep,
@@ -37,8 +40,7 @@ namespace RL_EXTENSIONS
                 radius,
                 maxSpeed,
                 velocity)},
-        mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}
-
+        mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}, useLidar_{useLidar}, lidarCount_{lidarCount}, lidarRange_{lidarRange}
   {
     std::size_t n = rvo_simulator_->getNumAgents(); // típicamente 0 en este punto
     goal_vector_x_.assign(n, 0.0f);
@@ -47,20 +49,19 @@ namespace RL_EXTENSIONS
     agent_pos_vector_y_.assign(n, 0.0f);
     dist_to_goal_vector_x_.assign(n, 0.0f);
     dist_to_goal_vector_y_.assign(n, 0.0f);
+    if (useLidar_)
+    {
+      rayCastingEngine_ = std::make_unique<RayCastingEngine>(lidarCount_, lidarRange_);
+    }
   }
   RVO2_RL_Wrapper::~RVO2_RL_Wrapper() = default;
 
-  void RVO2_RL_Wrapper::initRaycastingEngine(std::size_t count, float length)
+  float RVO2_RL_Wrapper::getLidarRange() const
   {
-    rayCastingEngine_ = std::make_unique<RayCastingEngine>(count, length);
-  };
-
-  float RVO2_RL_Wrapper::getRayLength() const
-  {
-    if (rayCastingEngine_)
+    if (useLidar_ && rayCastingEngine_)
       return rayCastingEngine_->getRayLength();
     else
-      return 1.0f;
+      return 0.0f;
   };
 
   // Returns a new vector<RVO::Vector2> combining the x/y arrays.
@@ -535,6 +536,50 @@ namespace RL_EXTENSIONS
                  ? getNeighborsObsPolarWithMask(agent_id)
                  : getNeighborsObsPolar(agent_id);
     }
+  }
+
+  pybind11::array_t<float> RVO2_RL_Wrapper::get_lidar(int agent_id) const
+  {
+    if (!useLidar_)
+    {
+      throw std::runtime_error("LIDAR disabled on this instance");
+    }
+
+    // 1) get normalized ranges + mask
+    std::vector<float> distances;
+    std::vector<uint8_t> mask;
+    getRayCastingProcessed(agent_id, distances, mask);
+
+    const auto &rays = rayCastingEngine_->getRays(); // vector<RVO::Vector2>
+    const ssize_t N = static_cast<pybind11::ssize_t>(distances.size());
+
+    // 2) decide how many columns: angle + range [+ mask]
+    const ssize_t cols = useObsMask_ ? 3 : 2;
+
+    // 3) allocate output array (N x cols)
+    // pybind11::array_t<float> arr({N, cols});
+    pybind11::array_t<float> arr({N, cols});
+    auto buf = arr.mutable_unchecked<2>();
+
+    // 4) fill it in one pass
+    for (ssize_t i = 0; i < N; ++i)
+    {
+      // compute angle from ray direction
+      const auto &d = rays[i];
+      float angle = std::atan2(d.y(), d.x());
+
+      buf(i, 0) = angle;        // θ in radians, relative to +X axis
+      buf(i, 1) = distances[i]; // normalized range ∈ [0,1]
+
+      if (useObsMask_)
+      {
+        buf(i, 2) = float(mask[i]); // 1.0 = hit, 0.0 = miss
+      } else{
+        buf(i, 1) = distances[i] * 3;
+      }      
+    }
+
+    return arr;
   }
 
 } // namespace RL_EXTENSIONS

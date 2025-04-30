@@ -17,7 +17,21 @@ void bind_wrapper_observation(py::class_<W> &cls)
                – If mode=Cartesian, mask=False: columns [pos_x,pos_y,vel_x,vel_y,pv_x,pv_y]  
                – If mode=Polar,     mask=False: columns [pos_x,pos_y,vel_mag,vel_ang,pv_mag,pv_ang]  
                – If mask=True: same as above plus an extra final column = 1.0 (real) or 0.0 (pad)
-               )doc");
+               )doc")
+        .def("get_lidar",
+             &W::get_lidar,
+             py::arg("agent_id"),
+             R"doc(
+                get_lidar(agent_id) -> numpy.ndarray of shape (N,2) or (N,3)
+
+                Each row is:
+                [angle, range]                if use_obs_mask=False
+                [angle, range, mask]          if use_obs_mask=True
+
+                - angle : float, radians from +X axis
+                - range : float ∈ [0,1], normalized distance
+                - mask  : 1.0 = hit, 0.0 = miss (only present if use_obs_mask=True)
+            )doc");
 }
 
 void bind_wrapper_goals(py::class_<W> &cls)
