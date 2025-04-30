@@ -1,0 +1,71 @@
+
+
+// void init_rl_extensions_raycasting(py::module &m)
+// {
+//     m.def("init_raycasting_engine", &RVO::RVOSimulator::initRaycastingEngine, py::arg("count") = 360, py::arg("length") = 18.0f,
+//           R"doc(
+//           Initialise (or re‑initialise) the internal RayCastingEngine.
+
+//           Parameters
+//           ----------
+//           count : int, optional
+//               How many evenly spaced rays to pre‑bake (default 360).
+
+//           length : float, optional
+//               World‑space length of each ray (default 18.0).
+
+//           Calling this again replaces the previous engine instance; any memory
+//           held by it is released automatically.
+//          )doc");
+//     m.def("get_raycasting", [](const RVO::RVOSimulator &sim, int agent_id)
+//           {
+//           // 1) ask the simulator to fill the hit arrays
+//           std::vector<float> out_x;
+//           std::vector<float> out_y;
+//           sim.getRayCast(agent_id, out_x, out_y);
+
+//           int n = out_x.size(); // fan count (360, 540, …)
+
+//           // 2) pack into a contiguous (n*2) float buffer
+//           float *buf = new float[n * 2];
+//           for (std::size_t i = 0; i < n; ++i)
+//           {
+//                buf[2 * i] = out_x[i];
+//                buf[2 * i + 1] = out_y[i];
+//           }
+
+//           // 3) create a capsule to own the buffer
+//           py::capsule free_when_done(buf, [](void *p)
+//                                      { delete[] reinterpret_cast<float *>(p); });
+
+//           // 4) expose as NumPy array with shape (n, 2)
+//           return py::array_t<float>(
+//               /* shape   */ {n, 2},
+//               /* strides */ {sizeof(float) * 2, sizeof(float)},
+//               /* data    */ buf,
+//               /* owner   */ free_when_done); }, py::arg("agent_id"),
+//           R"doc(
+//             Cast the pre‑baked ray fan for the given agent.
+
+//             Returns a NumPy array of shape (N, 2) where N is the ray count
+//             configured in initRaycastingEngine.  Each row is [x, y] of the
+//             first intersection; rows contain NaN if the ray misses.
+//       )doc");
+//     m.def("get_raycasting_processed", [](const RVO::RVOSimulator &sim, int agent_id)
+//           {
+//     std::vector<float> distances;
+//     std::vector<uint8_t> mask;
+//     sim.getRayCastingProcessed(agent_id, distances, mask);
+
+//     return py::make_tuple(
+//         py::array_t<float>(distances.size(), distances.data()),
+//         py::array_t<uint8_t>(mask.size(), mask.data())
+//     ); }, py::arg("agent_id"),
+//           R"doc(
+//     Returns a tuple of:
+//     - distances (normalized to [0, 1])
+//     - mask (1 = hit, 0 = miss)
+
+//     Useful for direct NN input.
+// )doc")
+// }

@@ -15,6 +15,7 @@ namespace RL_EXTENSIONS
   {
     return *rvo_simulator_;
   }
+  
   RVO2_RL_Wrapper::RVO2_RL_Wrapper(
       float timeStep,
       float neighborDist,
@@ -24,8 +25,8 @@ namespace RL_EXTENSIONS
       float radius,
       float maxSpeed,
       const RVO::Vector2 &velocity,
-      ObsMode mode = ObsMode::Cartesian,
-      bool useObsMask = false)
+      ObsMode mode,
+      bool useObsMask)
       : rvo_simulator_{
             std::make_unique<RVO::RVOSimulator>(
                 timeStep,
@@ -326,7 +327,8 @@ namespace RL_EXTENSIONS
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
     size_t n = rvo_simulator_->getAgentNumAgentNeighbors(agent_id);
 
-    pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
+    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(6)});
     auto buf = arr.mutable_unchecked<2>();
 #pragma omp simd
     for (size_t i = 0; i < n; ++i)
@@ -369,7 +371,8 @@ namespace RL_EXTENSIONS
 
     // Create a NumPy array of shape (maxNeighbors, 6)
     // Columns: pos_x, pos_y, vel_x, vel_y, pref_vel_x, pref_vel_y
-    pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
+    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(6)});
     // Access the buffer without bounds checking for maximum performance
     auto buf = arr.mutable_unchecked<2>();
 
@@ -407,7 +410,7 @@ namespace RL_EXTENSIONS
     return arr;
   }
 
-  pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsPolarWithMaskArray(int agent_id) const
+  pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsPolarWithMask(int agent_id) const
   {
     // Maximum neighbors and active neighbor count
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
@@ -415,7 +418,8 @@ namespace RL_EXTENSIONS
 
     // Create a single NumPy array with shape (maxNeighbors, 7)
     // Columns: pos_x, pos_y, vel_mag, vel_angle, pref_vel_mag, pref_vel_angle, mask
-    pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
+    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(7)});
     auto buf = arr.mutable_unchecked<2>();
 
 // Fill data and mask for actual neighbors
@@ -474,7 +478,8 @@ namespace RL_EXTENSIONS
 
     // Create a NumPy array of shape (maxNeighbors, 7)
     // Last column is mask: 1.0 for valid neighbor, 0.0 for padding
-    pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
+    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(7)});
     auto buf = arr.mutable_unchecked<2>(); // fast unchecked access
 
 // Populate actual neighbor entries
@@ -520,13 +525,13 @@ namespace RL_EXTENSIONS
   {
     if (mode_ == ObsMode::Cartesian)
     {
-      return useMask_
+      return useObsMask_
                  ? getNeighborsObsCartesianWithMask(agent_id)
                  : getNeighborsObsCartesian(agent_id);
     }
     else
     {
-      return useMask_
+      return useObsMask_
                  ? getNeighborsObsPolarWithMask(agent_id)
                  : getNeighborsObsPolar(agent_id);
     }

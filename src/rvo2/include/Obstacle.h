@@ -39,7 +39,7 @@
  */
 
 #include "Definitions.h"
-
+namespace RL_EXTENSIONS { class RVO2_RL_Wrapper; }
 namespace RVO
 {
 	/**

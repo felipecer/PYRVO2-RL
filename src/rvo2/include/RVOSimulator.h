@@ -43,7 +43,7 @@
 #include <vector>
 
 #include "Vector2.h"
-
+namespace RL_EXTENSIONS { class RVO2_RL_Wrapper; }
 namespace RVO
 {
 	/**

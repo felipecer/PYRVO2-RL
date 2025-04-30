@@ -37,8 +37,8 @@ ext_modules = [
         include_dirs=[
             ".",                   # para includes como "src/rvo2/include/..."
             SRC_DIR,               # por si incluyes directamente "rvo2/..."
-            INCLUDE_DIR,           # tus headers propios en src/include/
             RVO2_INCLUDE_DIR,      # headers vendorizados de RVO2
+            INCLUDE_DIR,           # tus headers propios en src/include/            
             pybind11.get_include(),  # pybind11 headers
         ],
         language="c++",
