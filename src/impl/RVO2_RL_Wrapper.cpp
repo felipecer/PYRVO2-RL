@@ -50,8 +50,12 @@ namespace RL_EXTENSIONS
     std::size_t n = rvo_simulator_->getNumAgents(); // típicamente 0 en este punto
     goal_vector_x_.assign(n, 0.0f);
     goal_vector_y_.assign(n, 0.0f);
+    goal_initial_vector_x_.assign(n, 0.0f);
+    goal_initial_vector_y_.assign(n, 0.0f);
     agent_pos_vector_x_.assign(n, 0.0f);
     agent_pos_vector_y_.assign(n, 0.0f);
+    agent_initial_pos_vector_x_.assign(n, 0.0f);
+    agent_initial_pos_vector_y_.assign(n, 0.0f);
     dist_to_goal_vector_x_.assign(n, 0.0f);
     dist_to_goal_vector_y_.assign(n, 0.0f);
     if (useLidar_)
@@ -115,6 +119,50 @@ namespace RL_EXTENSIONS
     }
   }
 
+  void RVO2_RL_Wrapper::setCurrentGoalsAsInitialGoals()
+  {
+    const size_t n = goal_vector_x_.size();
+    goal_initial_vector_x_.resize(n);
+    goal_initial_vector_y_.resize(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+      goal_initial_vector_x_[i] = goal_vector_x_[i];
+      goal_initial_vector_y_[i] = goal_vector_y_[i];
+    }    
+  }
+
+  void RVO2_RL_Wrapper::setCurrentPositionsAsInitialPositions()
+  {
+    const size_t n = agent_pos_vector_x_.size();
+    agent_initial_pos_vector_x_.resize(n);
+    agent_initial_pos_vector_y_.resize(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+      agent_initial_pos_vector_x_[i] = agent_pos_vector_x_[i];
+      agent_initial_pos_vector_y_[i] = agent_pos_vector_y_[i];
+    } 
+  }
+
+  void RVO2_RL_Wrapper::resetPositionAndGoalsToInit()
+  {
+    const size_t n = goal_initial_vector_x_.size();
+    goal_vector_x_.resize(n);
+    goal_vector_y_.resize(n);
+    for (size_t i = 0; i < n; ++i)
+    {
+      goal_vector_x_[i] = goal_initial_vector_x_[i];
+      goal_vector_y_[i] = goal_initial_vector_y_[i];
+    }    
+    const size_t m = agent_initial_pos_vector_x_.size();
+    agent_pos_vector_x_.resize(m);
+    agent_pos_vector_y_.resize(m);
+    for (size_t i = 0; i < m; ++i)
+    {
+      agent_pos_vector_x_[i] = agent_initial_pos_vector_x_[i];
+      agent_pos_vector_y_[i] = agent_initial_pos_vector_y_[i];
+    } 
+  }
+
   void RVO2_RL_Wrapper::setPreferredVelocities()
   {
     const int n = static_cast<int>(rvo_simulator_->getNumAgents());
@@ -170,12 +218,12 @@ namespace RL_EXTENSIONS
       float dx = goal_vector_x_[i] - agent_pos_vector_x_[i];
       float dy = goal_vector_y_[i] - agent_pos_vector_y_[i];
       float sq = dx * dx + dy * dy;
-      if (sq > 1.0f)
-      {
-        float inv = 1.0f / std::sqrt(sq);
-        dx *= inv;
-        dy *= inv;
-      }
+      // if (sq > 1.0f)
+      // {
+      //   float inv = 1.0f / std::sqrt(sq);
+      //   dx *= inv;
+      //   dy *= inv;
+      // }
       dist_to_goal_vector_x_[i] = dx;
       dist_to_goal_vector_y_[i] = dy;
     }
@@ -694,4 +742,62 @@ namespace RL_EXTENSIONS
     d["info"]  = info;  // vector<string> → Python list[str]
     return d;
 }  
+
+  float RVO2_RL_Wrapper::getDistanceToGoal(size_t agent_id, bool normalized) const
+  {
+    if (agent_id >= dist_to_goal_vector_x_.size())
+    {
+      throw std::out_of_range("getDistanceToGoal: agent_id out of range");
+    }
+
+    float dx = dist_to_goal_vector_x_[agent_id];
+    pybind11::print("dx: ", dx);
+    float dy = dist_to_goal_vector_y_[agent_id];
+    pybind11::print("dx: ", dy);
+    float distance = std::sqrt(dx * dx + dy * dy);
+
+    if (normalized)
+    {
+      
+      float og_dx = goal_initial_vector_x_[agent_id] - agent_initial_pos_vector_x_[agent_id];
+      pybind11::print("Hello 2");
+      float og_dy = goal_initial_vector_y_[agent_id] - agent_initial_pos_vector_y_[agent_id];
+      pybind11::print("Hello 3");
+      float og_distance = std::sqrt(og_dx * og_dx + og_dy * og_dy);
+      if (og_distance > 0.0f)
+      {
+        distance /= og_distance;
+      }
+    }
+
+    return distance;
+  }
+
+  std::vector<float> RVO2_RL_Wrapper::getAllDistancesToGoals(bool normalized) const
+  {
+    std::vector<float> distances;
+    distances.reserve(dist_to_goal_vector_x_.size());
+
+    for (size_t i = 0; i < dist_to_goal_vector_x_.size(); ++i)
+    {
+      float dx = dist_to_goal_vector_x_[i];
+      float dy = dist_to_goal_vector_y_[i];
+      float distance = std::sqrt(dx * dx + dy * dy);
+
+      if (normalized)
+      {
+        float og_dx = goal_initial_vector_x_[i] - agent_initial_pos_vector_x_[i];
+        float og_dy = goal_initial_vector_y_[i] - agent_initial_pos_vector_y_[i];
+        float og_distance = std::sqrt(og_dx * og_dx + og_dy * og_dy);
+        if (og_distance > 0.0f)
+        {
+          distance /= og_distance;
+        }
+      }
+
+      distances.push_back(distance);
+    }
+
+    return distances;
+  }
 } // namespace RL_EXTENSIONS

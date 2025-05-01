@@ -21,10 +21,14 @@ namespace RL_EXTENSIONS
   {
   private:
     std::unique_ptr<RayCastingEngine> rayCastingEngine_;
+    std::vector<float> goal_initial_vector_x_; ///< SoA: x‐coords of goals
+    std::vector<float> goal_initial_vector_y_;
     std::vector<float> goal_vector_x_; ///< SoA: x‐coords of goals
     std::vector<float> goal_vector_y_;
     std::vector<float> agent_pos_vector_x_;
     std::vector<float> agent_pos_vector_y_;
+    std::vector<float> agent_initial_pos_vector_x_;
+    std::vector<float> agent_initial_pos_vector_y_;
     std::vector<float> dist_to_goal_vector_x_;
     std::vector<float> dist_to_goal_vector_y_;
     std::size_t maxNeighbors_;
@@ -34,6 +38,7 @@ namespace RL_EXTENSIONS
     std::unique_ptr<RVO::RVOSimulator> rvo_simulator_;
     ObsMode mode_;
     bool useObsMask_;
+    std::vector<std::string> agent_behaviors_; // Stores behaviors for each agent
     friend class RVO::Agent;
     friend class RVO::KdTree;
     friend class RVO::Obstacle;
@@ -59,7 +64,9 @@ namespace RL_EXTENSIONS
         float lidarRange = 18.0f);
     RVO::RVOSimulator &getSimulator();
     const RVO::RVOSimulator &getSimulator() const;
-    pybind11::dict get_observation_bounds() const;  
+    pybind11::dict get_observation_bounds() const;
+    std::vector<float> getAllDistancesToGoals(bool normalized) const;
+    float getDistanceToGoal(size_t agent_id, bool normalized) const;
     ~RVO2_RL_Wrapper();
     pybind11::array_t<float> get_neighbors(int agent_id) const;
     pybind11::array_t<float> get_lidar(int agent_id) const;
@@ -71,6 +78,9 @@ namespace RL_EXTENSIONS
     void setGoal(std::size_t agent_id, const RVO::Vector2 &goal);
     RVO::Vector2 getGoal(std::size_t agent_id) const;
     void setGoals(const std::vector<RVO::Vector2> &goals);
+    void setCurrentGoalsAsInitialGoals();
+    void setCurrentPositionsAsInitialPositions();
+    void resetPositionAndGoalsToInit();
     void setPreferredVelocities();
     void computeDistancesToGoal();
     void computeAllAgentsPositions();
@@ -88,6 +98,28 @@ namespace RL_EXTENSIONS
     const std::vector<float> &getDistToGoalsY() const { return dist_to_goal_vector_y_; }
     ObsMode getMode() const { return mode_; }
     bool isUsingObsMask() const { return useObsMask_; }
+    bool isUsingLidar() const { return useLidar_; }
+
+    // Getter for an agent's behavior
+    std::string getAgentBehavior(size_t agent_id) const {
+        if (agent_id >= agent_behaviors_.size()) {
+            throw std::out_of_range("Agent ID out of range");
+        }
+        return agent_behaviors_[agent_id];
+    }
+
+    // Setter for an agent's behavior
+    void setAgentBehavior(size_t agent_id, const std::string &behavior) {
+        if (agent_id >= agent_behaviors_.size()) {
+            throw std::out_of_range("Agent ID out of range");
+        }
+        agent_behaviors_[agent_id] = behavior;
+    }
+
+    // Initialize behaviors for all agents
+    void initializeAgentBehaviors(size_t num_agents, const std::string &default_behavior = "") {
+        agent_behaviors_.resize(num_agents, default_behavior);
+    }
   };
 } // namespace RL_EXTENSIONS
 
