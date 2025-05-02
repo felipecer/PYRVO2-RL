@@ -751,18 +751,14 @@ namespace RL_EXTENSIONS
     }
 
     float dx = dist_to_goal_vector_x_[agent_id];
-    pybind11::print("dx: ", dx);
-    float dy = dist_to_goal_vector_y_[agent_id];
-    pybind11::print("dx: ", dy);
+    float dy = dist_to_goal_vector_y_[agent_id];    
     float distance = std::sqrt(dx * dx + dy * dy);
 
     if (normalized)
     {
       
-      float og_dx = goal_initial_vector_x_[agent_id] - agent_initial_pos_vector_x_[agent_id];
-      pybind11::print("Hello 2");
-      float og_dy = goal_initial_vector_y_[agent_id] - agent_initial_pos_vector_y_[agent_id];
-      pybind11::print("Hello 3");
+      float og_dx = goal_initial_vector_x_[agent_id] - agent_initial_pos_vector_x_[agent_id];      
+      float og_dy = goal_initial_vector_y_[agent_id] - agent_initial_pos_vector_y_[agent_id];      
       float og_distance = std::sqrt(og_dx * og_dx + og_dy * og_dy);
       if (og_distance > 0.0f)
       {

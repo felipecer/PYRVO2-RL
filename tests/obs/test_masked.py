@@ -17,8 +17,8 @@ def main():
         wrapper_cart_masked.get_simulator().add_agent(Vector2(*pos))
         wrapper_polar_masked.get_simulator().add_agent(Vector2(*pos))
 
-    wrapper_cart_masked .set_goals_list([Vector2(x,y) for x,y in goals])
-    wrapper_polar_masked.set_goals_list([Vector2(x,y) for x,y in goals])
+    wrapper_cart_masked .set_goals([Vector2(x,y) for x,y in goals])
+    wrapper_polar_masked.set_goals([Vector2(x,y) for x,y in goals])
 
     # 4) Abrir fichero de resultados
     out_path = "rvo2rl_masked_test_results.txt"

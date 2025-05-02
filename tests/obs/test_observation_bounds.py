@@ -18,8 +18,7 @@ def summarize_bounds(wrapper, params):
       - number of info lines
       - each info line
     """
-    b = wrapper.get_observation_bounds()
-    print(b)
+    b = wrapper.get_observation_bounds()    
     low   = np.asarray(b["low"])
     high  = np.asarray(b["high"])
     info  = list(b["info"])

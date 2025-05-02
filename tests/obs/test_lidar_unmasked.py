@@ -32,7 +32,7 @@ def main():
     sim.process_obstacles()
 
     # 4) Set goal to NE direction (10,10)
-    wrapper.set_goals_list([Vector2(10.0, 10.0)])
+    wrapper.set_goals([Vector2(10.0, 10.0)])
 
     # 5) Run steps and capture angles + distances
     out_path = "lidar_unmasked_test_results.txt"

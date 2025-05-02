@@ -19,25 +19,17 @@ def main():
 
     # Run simulation and compare distances
     out_path = "normalized_vs_raw_distance_results.txt"
-    with open(out_path, "w") as f:
-        print("1")
-        f.write("Step-by-step distances (raw vs normalized):\n\n")
-        print("2")
-        for step in range(5):
-            print("3")
-            f.write(f"=== Step {step} ===\n")
-            print("4")
+    with open(out_path, "w") as f:        
+        f.write("Step-by-step distances (raw vs normalized):\n\n")        
+        for step in range(5):            
+            f.write(f"=== Step {step} ===\n")            
             # Compute preferred velocities and advance simulation
             wrapper.set_preferred_velocities()
             wrapper.get_simulator().do_step()
-            print(5)
             # Log distances for each agent
-            for agent_id in range(len(positions)):
-                print("agent_id: ", agent_id)
+            for agent_id in range(len(positions)):                
                 raw_distance = wrapper.get_distance_to_goal(agent_id, normalized=False)
-                print(6)
-                normalized_distance = wrapper.get_distance_to_goal(agent_id, normalized=True)
-                print(7)
+                normalized_distance = wrapper.get_distance_to_goal(agent_id, normalized=True)                
                 f.write(f"Agent {agent_id}: Raw={raw_distance:.3f}, Normalized={normalized_distance:.3f}\n")
 
             f.write("\n")

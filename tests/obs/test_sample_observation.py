@@ -52,7 +52,7 @@ def run_test(name, **cfg):
     # 6) Fetch bounds & a sample observation
     bounds = wrapper.get_observation_bounds()
     obs    = wrapper.get_observation(0)
-    print(obs)
+
     low  = np.asarray(bounds["low"],  dtype=np.float32)
     high = np.asarray(bounds["high"], dtype=np.float32)
     info = bounds["info"]
