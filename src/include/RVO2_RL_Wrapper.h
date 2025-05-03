@@ -62,6 +62,7 @@ namespace RL_EXTENSIONS
         bool useLidar = false,
         std::size_t lidarCount = 360,
         float lidarRange = 18.0f);
+    void initialize();
     RVO::RVOSimulator &getSimulator();
     const RVO::RVOSimulator &getSimulator() const;
     pybind11::dict get_observation_bounds() const;

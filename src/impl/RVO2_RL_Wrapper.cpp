@@ -9,6 +9,44 @@ using std::vector;
 
 namespace RL_EXTENSIONS
 {
+  void RVO2_RL_Wrapper::initialize()
+  {
+    // Check if the simulator is initialized
+    if (!rvo_simulator_)
+    {
+      throw std::runtime_error("Simulator is not initialized.");
+    }
+
+    // Ensure there are agents in the simulator
+    if (rvo_simulator_->getNumAgents() == 0)
+    {
+      throw std::runtime_error("No agents have been added to the simulator.");
+    }
+
+    // Ensure goals are set for all agents
+    if (goal_vector_x_.size() != rvo_simulator_->getNumAgents() ||
+        goal_vector_y_.size() != rvo_simulator_->getNumAgents())
+    {
+      throw std::runtime_error("Goals are not properly set for all agents.");
+    }
+
+    // If LIDAR is enabled, ensure the ray casting engine is initialized
+    if (useLidar_ && !rayCastingEngine_)
+    {
+      throw std::runtime_error("LIDAR is enabled, but the RayCastingEngine is not initialized.");
+    }
+
+    // Set current positions and goals as initial values
+    setCurrentPositionsAsInitialPositions();
+    setCurrentGoalsAsInitialGoals();
+
+    // Compute initial distances to goals
+    computeDistancesToGoal();
+
+    // Log initialization success
+    pybind11::print("RVO2_RL_Wrapper initialized successfully with ", rvo_simulator_->getNumAgents(), " agents.");    
+  }
+
   // Return a mutable reference
   RVO::RVOSimulator &RVO2_RL_Wrapper::getSimulator()
   {
