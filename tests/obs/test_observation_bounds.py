@@ -6,8 +6,10 @@ from rvo2_rl.rl import RVO2RLWrapper, ObsMode
 
 OUT_FILE = "observation_bounds_report.txt"
 
+
 def stringify_mode(m):
     return "Cartesian" if m == ObsMode.Cartesian else "Polar"
+
 
 def summarize_bounds(wrapper, params):
     """
@@ -18,11 +20,16 @@ def summarize_bounds(wrapper, params):
       - number of info lines
       - each info line
     """
-    b = wrapper.get_observation_bounds()    
-    low   = np.asarray(b["low"])
-    high  = np.asarray(b["high"])
-    info  = list(b["info"])
-    mode  = b["mode"]
+    b = wrapper.get_observation_limits()
+    low = np.asarray(b["low"])
+    high = np.asarray(b["high"])
+    print(params)
+    print("low")
+    print(low)
+    print("high")
+    print(high)
+    info = list(b["info"])
+    mode = b["mode"]
     # build summary text
     lines = []
     lines.append(f"---\nParameters: {params}")
@@ -40,13 +47,14 @@ def summarize_bounds(wrapper, params):
     lines.append("")  # blank line
     return "\n".join(lines)
 
+
 def main():
     # Define parameter grids
-    modes         = [ObsMode.Cartesian, ObsMode.Polar]
-    masks         = [False, True]
-    lidars        = [False, True]
-    max_neighbors = [0, 1, 3, 10]
-    lidar_counts  = [4, 16]
+    modes = [ObsMode.Cartesian, ObsMode.Polar]
+    masks = [False, True]
+    lidars = [False, True]
+    max_neighbors = [1, 2]
+    lidar_counts = [2, 4]
 
     report_lines = []
     report_lines.append("Observation Bounds Robust Report")
@@ -94,6 +102,7 @@ def main():
         f.write("\n".join(report_lines))
 
     print(f"Finished. See {OUT_FILE} for full report.")
+
 
 if __name__ == "__main__":
     main()

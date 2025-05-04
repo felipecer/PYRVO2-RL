@@ -6,10 +6,97 @@
 using W = RL_EXTENSIONS::RVO2_RL_Wrapper;
 namespace py = pybind11;
 
+void bind_wrapper_general_purpose_functions(py::class_<W> &cls)
+{
+  cls.def("initialize", &RL_EXTENSIONS::RVO2_RL_Wrapper::initialize,
+          R"doc(
+           Initialize the RVO2 wrapper. This must be called after adding agents and setting goals.
+           Throws:
+               RuntimeError: If simulator is not initialized
+               RuntimeError: If no agents have been added 
+               RuntimeError: If goals are not properly set for all agents
+               RuntimeError: If LIDAR is enabled but RayCastingEngine is not initialized
+           )doc");
+
+  cls.def("add_agent",
+          py::overload_cast<const RVO::Vector2 &>(&RL_EXTENSIONS::RVO2_RL_Wrapper::add_agent),
+          py::arg("position"));
+  cls.def("add_agent",
+          py::overload_cast<const RVO::Vector2 &, float, size_t, float, float, float, float, const RVO::Vector2 &>(
+              &RL_EXTENSIONS::RVO2_RL_Wrapper::add_agent),
+          py::arg("position"),
+          py::arg("neighborDist"),
+          py::arg("maxNeighbors"),
+          py::arg("timeHorizon"),
+          py::arg("timeHorizonObst"),
+          py::arg("radius"),
+          py::arg("maxSpeed"),
+          py::arg("velocity") = RVO::Vector2());
+
+  cls.def("set_current_goals_as_initial_goals", &RL_EXTENSIONS::RVO2_RL_Wrapper::setCurrentGoalsAsInitialGoals,
+          R"doc(
+           Sets the current goals as the initial goals for all agents.
+           )doc");
+
+  cls.def("set_current_positions_as_initial_positions", &RL_EXTENSIONS::RVO2_RL_Wrapper::setCurrentPositionsAsInitialPositions,
+          R"doc(
+           Sets the current positions as the initial positions for all agents.
+           )doc");
+
+  cls.def("reset_position_and_goals_to_init", &RL_EXTENSIONS::RVO2_RL_Wrapper::resetPositionAndGoalsToInit,
+          R"doc(
+           Resets the positions and goals of all agents to their initial states.
+           )doc");
+
+  cls.def("get_agent_behavior", &RL_EXTENSIONS::RVO2_RL_Wrapper::getAgentBehavior,
+          py::arg("agent_id"),
+          R"doc(
+           Returns the behavior of the specified agent.
+           )doc");
+
+  cls.def("set_agent_behavior", &RL_EXTENSIONS::RVO2_RL_Wrapper::setAgentBehavior,
+          py::arg("agent_id"),
+          py::arg("behavior"),
+          R"doc(
+           Sets the behavior of the specified agent.
+           )doc");
+
+  cls.def("initialize_agent_behaviors", &RL_EXTENSIONS::RVO2_RL_Wrapper::initializeAgentBehaviors,
+          py::arg("num_agents"),
+          py::arg("default_behavior") = "",
+          R"doc(
+           Initializes the behaviors for all agents with an optional default behavior.
+           )doc");
+
+  cls.def("get_agent_data_for_vis", [](const RL_EXTENSIONS::RVO2_RL_Wrapper &wrap)
+          {
+            auto vec = wrap.collectAgentsBatchData();
+            py::list pylist;
+
+            for (const auto &d : vec)
+            {
+              pylist.append(py::make_tuple(
+                  d.id,
+                  d.px, d.py,
+                  py::make_tuple(d.vx, d.vy),
+                  py::make_tuple(d.pvx, d.pvy),
+                  d.dist_goal));
+            }
+            return pylist; // Python list[tuple]
+          },
+          R"doc(
+          Return a list of tuples:
+
+              (agent_id, x, y, (vx, vy), (pvx, pvy), dist_to_goal)
+
+          All agents are gathered in one C++ call, eliminating per‑agent overhead.
+          )doc");
+}
+
 void bind_wrapper_observation(py::class_<W> &cls)
 {
   cls
-      .def("get_observation_bounds", &RL_EXTENSIONS::RVO2_RL_Wrapper::get_observation_bounds,
+      .def("get_observation_limits", &RL_EXTENSIONS::RVO2_RL_Wrapper::get_observation_bounds,
            R"doc(
             Return a dict with the following entries:
             
@@ -150,55 +237,19 @@ void bind_wrapper_goals(py::class_<W> &cls)
         return py::make_tuple(v.x(), v.y()); }, py::arg("agent_id"));
 
   cls.def("get_all_distances_to_goals", &RL_EXTENSIONS::RVO2_RL_Wrapper::getAllDistancesToGoals,
-           py::arg("normalized") = false,
-           R"doc(
+          py::arg("normalized") = false,
+          R"doc(
            Returns a list of distances from all agents to their goals.
            If `normalized` is True, the distances are normalized against the original distances.
            )doc");
 
-  cls.def("get_distance_to_goal", [](const RL_EXTENSIONS::RVO2_RL_Wrapper &wrap, size_t agent_id, bool normalized) {
+  cls.def("get_distance_to_goal", [](const RL_EXTENSIONS::RVO2_RL_Wrapper &wrap, size_t agent_id, bool normalized)
+          {
     try {
         return wrap.getDistanceToGoal(agent_id, normalized);
     } catch (const std::out_of_range &e) {
         throw std::runtime_error(std::string("Out of range error in get_distance_to_goal: ") + e.what());
     } catch (const std::exception &e) {
         throw std::runtime_error(std::string("General error in get_distance_to_goal: ") + e.what());
-    }
-}, py::arg("agent_id"), py::arg("normalized") = false,
-R"doc(Returns the distance from a specific agent to its goal. If `normalized` is True, the distance is normalized against the original distance.)doc");
-
-  cls.def("set_current_goals_as_initial_goals", &RL_EXTENSIONS::RVO2_RL_Wrapper::setCurrentGoalsAsInitialGoals,
-           R"doc(
-           Sets the current goals as the initial goals for all agents.
-           )doc");
-
-  cls.def("set_current_positions_as_initial_positions", &RL_EXTENSIONS::RVO2_RL_Wrapper::setCurrentPositionsAsInitialPositions,
-           R"doc(
-           Sets the current positions as the initial positions for all agents.
-           )doc");
-
-  cls.def("reset_position_and_goals_to_init", &RL_EXTENSIONS::RVO2_RL_Wrapper::resetPositionAndGoalsToInit,
-           R"doc(
-           Resets the positions and goals of all agents to their initial states.
-           )doc");
-
-  cls.def("get_agent_behavior", &RL_EXTENSIONS::RVO2_RL_Wrapper::getAgentBehavior,
-           py::arg("agent_id"),
-           R"doc(
-           Returns the behavior of the specified agent.
-           )doc");
-
-  cls.def("set_agent_behavior", &RL_EXTENSIONS::RVO2_RL_Wrapper::setAgentBehavior,
-           py::arg("agent_id"),
-           py::arg("behavior"),
-           R"doc(
-           Sets the behavior of the specified agent.
-           )doc");
-
-  cls.def("initialize_agent_behaviors", &RL_EXTENSIONS::RVO2_RL_Wrapper::initializeAgentBehaviors,
-           py::arg("num_agents"),
-           py::arg("default_behavior") = "",
-           R"doc(
-           Initializes the behaviors for all agents with an optional default behavior.
-           )doc");
+    } }, py::arg("agent_id"), py::arg("normalized") = false, R"doc(Returns the distance from a specific agent to its goal. If `normalized` is True, the distance is normalized against the original distance.)doc");
 }

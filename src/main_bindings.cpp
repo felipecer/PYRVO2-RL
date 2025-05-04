@@ -3,7 +3,7 @@
 #include <pybind11/stl.h>
 #include "src/include/RVO2_RL_Wrapper.h"
 using W = RL_EXTENSIONS::RVO2_RL_Wrapper;
-using SimRef = RVO::RVOSimulator&;
+using SimRef = RVO::RVOSimulator &;
 
 // Forward declarations of your init functions
 void init_vector2(pybind11::module &m);
@@ -12,6 +12,7 @@ void init_rvo2simulator(pybind11::module &m);
 void init_openmp(pybind11::module &m);
 void bind_wrapper_observation(pybind11::class_<W> &cls);
 void bind_wrapper_goals(pybind11::class_<W> &cls);
+void bind_wrapper_general_purpose_functions(pybind11::class_<W> &cls);
 
 namespace py = pybind11;
 
@@ -59,10 +60,10 @@ PYBIND11_MODULE(rvo2_rl, m)
                     .def("set_preferred_velocities",
                          &RL_EXTENSIONS::RVO2_RL_Wrapper::setPreferredVelocities)
                     .def("get_simulator",
-                              static_cast<SimRef (W::*)()>(&W::getSimulator),
-                              py::return_value_policy::reference_internal,
-                              "Returns the internal RVOSimulator (mutable)");
-
+                         static_cast<SimRef (W::*)()>(&W::getSimulator),
+                         py::return_value_policy::reference_internal,
+                         "Returns the internal RVOSimulator (mutable)");
+     bind_wrapper_general_purpose_functions(cls);
      bind_wrapper_goals(cls);
      bind_wrapper_observation(cls);
      // init_rl_extensions_raycasting(m_rl);

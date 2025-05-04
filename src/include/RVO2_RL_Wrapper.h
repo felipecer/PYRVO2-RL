@@ -71,7 +71,11 @@ namespace RL_EXTENSIONS
     ~RVO2_RL_Wrapper();
     pybind11::array_t<float> get_neighbors(int agent_id) const;
     pybind11::array_t<float> get_lidar(int agent_id) const;
-    
+    size_t add_agent(const RVO::Vector2 &position, float neighborDist,
+                     size_t maxNeighbors, float timeHorizon,
+                     float timeHorizonObst, float radius, float maxSpeed,
+                     const RVO::Vector2 &velocity = RVO::Vector2());
+    size_t add_agent(const RVO::Vector2 &position);
 
     float getLidarRange() const;
 
@@ -102,24 +106,30 @@ namespace RL_EXTENSIONS
     bool isUsingLidar() const { return useLidar_; }
 
     // Getter for an agent's behavior
-    std::string getAgentBehavior(size_t agent_id) const {
-        if (agent_id >= agent_behaviors_.size()) {
-            throw std::out_of_range("Agent ID out of range");
-        }
-        return agent_behaviors_[agent_id];
+    std::string getAgentBehavior(size_t agent_id) const
+    {
+      if (agent_id >= agent_behaviors_.size())
+      {
+        throw std::out_of_range("Agent ID out of range");
+      }
+      return agent_behaviors_[agent_id];
     }
 
     // Setter for an agent's behavior
-    void setAgentBehavior(size_t agent_id, const std::string &behavior) {
-        if (agent_id >= agent_behaviors_.size()) {
-            throw std::out_of_range("Agent ID out of range");
-        }
-        agent_behaviors_[agent_id] = behavior;
+    void setAgentBehavior(size_t agent_id, const std::string &behavior)
+    {
+      if (agent_id >= agent_behaviors_.size())
+      {
+        // resize to hold agent_id + 1 entries, defaulting new strings to ""
+        agent_behaviors_.resize(agent_id + 1);
+      }
+      agent_behaviors_[agent_id] = behavior;
     }
 
     // Initialize behaviors for all agents
-    void initializeAgentBehaviors(size_t num_agents, const std::string &default_behavior = "") {
-        agent_behaviors_.resize(num_agents, default_behavior);
+    void initializeAgentBehaviors(size_t num_agents, const std::string &default_behavior = "")
+    {
+      agent_behaviors_.resize(num_agents, default_behavior);
     }
   };
 } // namespace RL_EXTENSIONS

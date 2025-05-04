@@ -11,16 +11,19 @@ namespace RL_EXTENSIONS
 {
   void RVO2_RL_Wrapper::initialize()
   {
+    pybind11::print("Initializing Simulator");
     // Check if the simulator is initialized
     if (!rvo_simulator_)
     {
       throw std::runtime_error("Simulator is not initialized.");
+      pybind11::print("Simulator is not initialized.");
     }
 
     // Ensure there are agents in the simulator
     if (rvo_simulator_->getNumAgents() == 0)
     {
       throw std::runtime_error("No agents have been added to the simulator.");
+      pybind11::print("No agents have been added to the simulator.");
     }
 
     // Ensure goals are set for all agents
@@ -28,23 +31,26 @@ namespace RL_EXTENSIONS
         goal_vector_y_.size() != rvo_simulator_->getNumAgents())
     {
       throw std::runtime_error("Goals are not properly set for all agents.");
+      pybind11::print("Goals are not properly set for all agents.");
     }
 
     // If LIDAR is enabled, ensure the ray casting engine is initialized
     if (useLidar_ && !rayCastingEngine_)
     {
       throw std::runtime_error("LIDAR is enabled, but the RayCastingEngine is not initialized.");
+      pybind11::print("LIDAR is enabled, but the RayCastingEngine is not initialized.");
     }
 
     // Set current positions and goals as initial values
     setCurrentPositionsAsInitialPositions();
+    pybind11::print("setCurrentPositionsAsInitialPositions");
     setCurrentGoalsAsInitialGoals();
-
+    pybind11::print("setCurrentGoalsAsInitialGoals");
     // Compute initial distances to goals
     computeDistancesToGoal();
-
+    pybind11::print("computeDistancesToGoal");
     // Log initialization success
-    pybind11::print("RVO2_RL_Wrapper initialized successfully with ", rvo_simulator_->getNumAgents(), " agents.");    
+    pybind11::print("RVO2_RL_Wrapper initialized successfully with ", rvo_simulator_->getNumAgents(), " agents.");
   }
 
   // Return a mutable reference
@@ -96,12 +102,50 @@ namespace RL_EXTENSIONS
     agent_initial_pos_vector_y_.assign(n, 0.0f);
     dist_to_goal_vector_x_.assign(n, 0.0f);
     dist_to_goal_vector_y_.assign(n, 0.0f);
+    agent_behaviors_.assign(n, "");
     if (useLidar_)
     {
       rayCastingEngine_ = std::make_unique<RayCastingEngine>(lidarCount_, lidarRange_);
     }
   }
   RVO2_RL_Wrapper::~RVO2_RL_Wrapper() = default;
+
+  size_t RVO2_RL_Wrapper::add_agent(const RVO::Vector2 &position)
+  {
+    // Add the agent to the RVO simulator
+    size_t id = rvo_simulator_->addAgent(position);
+
+    // Push the position of the new agent to the end of the position vectors
+    agent_pos_vector_x_.push_back(position.x());
+    agent_pos_vector_y_.push_back(position.y());
+
+    return id;
+  }
+
+  size_t RVO2_RL_Wrapper::add_agent(const RVO::Vector2 &position,
+                                    float neighborDist,
+                                    size_t maxNeighbors,
+                                    float timeHorizon,
+                                    float timeHorizonObst,
+                                    float radius,
+                                    float maxSpeed,
+                                    const RVO::Vector2 &velocity)
+  {
+    // Add the agent to the RVO simulator with all parameters
+    size_t id = rvo_simulator_->addAgent(position,
+                                         neighborDist,
+                                         maxNeighbors,
+                                         timeHorizon,
+                                         timeHorizonObst,
+                                         radius,
+                                         maxSpeed,
+                                         velocity);
+
+    // Store the position of the new agent
+    agent_pos_vector_x_.push_back(position.x());
+    agent_pos_vector_y_.push_back(position.y());
+    return id;
+  }
 
   float RVO2_RL_Wrapper::getLidarRange() const
   {
@@ -166,7 +210,7 @@ namespace RL_EXTENSIONS
     {
       goal_initial_vector_x_[i] = goal_vector_x_[i];
       goal_initial_vector_y_[i] = goal_vector_y_[i];
-    }    
+    }
   }
 
   void RVO2_RL_Wrapper::setCurrentPositionsAsInitialPositions()
@@ -178,7 +222,7 @@ namespace RL_EXTENSIONS
     {
       agent_initial_pos_vector_x_[i] = agent_pos_vector_x_[i];
       agent_initial_pos_vector_y_[i] = agent_pos_vector_y_[i];
-    } 
+    }
   }
 
   void RVO2_RL_Wrapper::resetPositionAndGoalsToInit()
@@ -190,7 +234,7 @@ namespace RL_EXTENSIONS
     {
       goal_vector_x_[i] = goal_initial_vector_x_[i];
       goal_vector_y_[i] = goal_initial_vector_y_[i];
-    }    
+    }
     const size_t m = agent_initial_pos_vector_x_.size();
     agent_pos_vector_x_.resize(m);
     agent_pos_vector_y_.resize(m);
@@ -198,7 +242,7 @@ namespace RL_EXTENSIONS
     {
       agent_pos_vector_x_[i] = agent_initial_pos_vector_x_[i];
       agent_pos_vector_y_[i] = agent_initial_pos_vector_y_[i];
-    } 
+    }
   }
 
   void RVO2_RL_Wrapper::setPreferredVelocities()
@@ -246,7 +290,15 @@ namespace RL_EXTENSIONS
 
   void RVO2_RL_Wrapper::computeDistancesToGoal()
   {
+
     const int n = static_cast<int>(rvo_simulator_->getNumAgents());
+    pybind11::print("Agent count: ", n);
+    pybind11::print("dist_to_goal_vector_x_.size(): ", dist_to_goal_vector_x_.size());
+    pybind11::print("dist_to_goal_vector_y_.size(): ", dist_to_goal_vector_y_.size());
+    pybind11::print("goal_vector_x_.size(): ", goal_vector_x_.size());
+    pybind11::print("goal_vector_y_.size(): ", goal_vector_y_.size());
+    pybind11::print("agent_pos_vector_x_.size(): ", agent_pos_vector_x_.size());
+    pybind11::print("agent_pos_vector_y_.size(): ", agent_pos_vector_y_.size());
     dist_to_goal_vector_x_.resize(n);
     dist_to_goal_vector_y_.resize(n);
 
@@ -675,111 +727,154 @@ namespace RL_EXTENSIONS
     return arr;
   }
 
-  pybind11::dict RVO2_RL_Wrapper::get_observation_bounds() const {
-    std::vector<float>       low, high;
+  pybind11::dict RVO2_RL_Wrapper::get_observation_bounds() const
+  {
+    using ssize = pybind11::ssize_t;
+
+    std::vector<float> low, high;
     std::vector<std::string> info;
 
-    // 1) step
-    low .push_back(0.0f);    high.push_back(1.0f);
+    // ─────────────────────────────────────────────────────────────────────
+    // 1) step ∈ [0,1]
+    // ─────────────────────────────────────────────────────────────────────
+    low.push_back(0.0f);
+    high.push_back(1.0f);
     info.push_back("[0] step ∈ [0,1]");
 
-    // 2) agent position
-    low .insert(low.end(),  { -1000.0f, -1000.0f });
-    high.insert(high.end(), {  1000.0f,  1000.0f });
-    info.push_back("[1:3] agent position x,y ∈ [-1000,1000]");
+    // ─────────────────────────────────────────────────────────────────────
+    // 2) dist_to_goal_x,y ∈ [-1,1]
+    // ─────────────────────────────────────────────────────────────────────
+    low.insert(low.end(), {-1.0f, -1.0f});
+    high.insert(high.end(), {1.0f, 1.0f});
+    info.push_back("[1:3] dist_to_goal_x,y ∈ [-1,1]");
 
-    // 3) optional LIDAR
+    // ─────────────────────────────────────────────────────────────────────
+    // 3) optional LIDAR block: [angle, range (,(mask))] * lidarCount_
+    // ─────────────────────────────────────────────────────────────────────
     size_t idx = low.size();
-    if (useLidar_) {
-        // angles ∈ [-π,π)
-        low .insert(low.end(),  lidarCount_, -M_PI);
-        high.insert(high.end(), lidarCount_,  M_PI);
-        {
-            std::ostringstream oss;
-            oss << "[" << idx << ":" << (idx + lidarCount_)
-                << ") LIDAR angles ∈ [-π,π)";
-            info.push_back(oss.str());
-        }
-        idx += lidarCount_;
-
-        // normalized ranges ∈ [0,1]
-        low .insert(low.end(),  lidarCount_, 0.0f);
-        high.insert(high.end(), lidarCount_, 1.0f);
-        {
-            std::ostringstream oss;
-            oss << "[" << idx << ":" << (idx + lidarCount_)
-                << "] LIDAR normalized ranges ∈ [0,1]";
-            info.push_back(oss.str());
-        }
-        idx += lidarCount_;
-
-        if (useObsMask_) {
-            // hit-mask ∈ {0,1}
-            low .insert(low.end(),  lidarCount_, 0.0f);
-            high.insert(high.end(), lidarCount_, 1.0f);
-            std::ostringstream oss;
-            oss << "[" << idx << ":" << (idx + lidarCount_)
-                << "] LIDAR hit-mask ∈ {0,1}";
-            info.push_back(oss.str());
-            idx += lidarCount_;
-        }
-    }
-
-    // 4) neighbor block (Cartesian vs Polar)
-    size_t base = idx;
-    for (size_t i = 0; i < maxNeighbors_; ++i) {
-        // pos x,y
-        low .push_back(-1000.0f); high.push_back(1000.0f);
-        low .push_back(-1000.0f); high.push_back(1000.0f);
-        // velocity/mag
-        low .push_back(0.0f); high.push_back(1.0f);
-        if (mode_ == ObsMode::Cartesian) {
-            low .push_back(-1000.0f); high.push_back(1000.0f);
-        } else {
-            low .push_back(-M_PI);    high.push_back(M_PI);
-        }
-        // preferred velocity/mag
-        low .push_back(0.0f); high.push_back(1.0f);
-        if (mode_ == ObsMode::Cartesian) {
-            low .push_back(-1000.0f); high.push_back(1000.0f);
-        } else {
-            low .push_back(-M_PI);    high.push_back(M_PI);
-        }
-    }
+    if (useLidar_)
     {
-        std::ostringstream oss;
-        oss << "[" << base << ":" << (base + 6*maxNeighbors_)
-            << "] neighbors (" << maxNeighbors_ << "×"
-            << (mode_==ObsMode::Cartesian
+      const size_t per_ray = useObsMask_ ? 3 : 2;
+      const size_t total = lidarCount_ * per_ray;
+
+      // Reserve space (optional, but avoids reallocations)
+      low.reserve(idx + total);
+      high.reserve(idx + total);
+
+      for (size_t i = 0; i < lidarCount_; ++i)
+      {
+        // a) angle ∈ [–π,π)
+        low.push_back(-static_cast<float>(M_PI));
+        high.push_back(static_cast<float>(M_PI));
+
+        // b) normalized range ∈ [0,1]
+        low.push_back(0.0f);
+        high.push_back(1.0f);
+
+        // c) optionally mask ∈ {0,1}
+        if (useObsMask_)
+        {
+          low.push_back(0.0f);
+          high.push_back(1.0f);
+        }
+      }
+
+      // Build the human‐readable info line
+      std::ostringstream oss;
+      oss << "[" << idx << ":" << (idx + total) << ") lidar ";
+      oss << (useObsMask_ ? "(angle,range,mask) * " : "(angle,range) * ");
+      oss << lidarCount_;
+      info.push_back(oss.str());
+
+      // Advance our write‐cursor
+      idx += total;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 4) neighbor block: [features + optional mask] * maxNeighbors_
+    //    Cartesian fields:    pos_x,  pos_y,  vel_x,  vel_y,  pref_x,  pref_y
+    //    Polar    fields:    pos_x,  pos_y,  vel_mag,vel_ang,pref_mag,pref_ang
+    // ─────────────────────────────────────────────────────────────────────
+    const size_t base = low.size();
+    const size_t feat_nbr = 6 + (useObsMask_ ? 1 : 0); // per‐neighbor column count
+    // Pre‑reserve to avoid reallocations
+    low.reserve(base + maxNeighbors_ * feat_nbr);
+    high.reserve(base + maxNeighbors_ * feat_nbr);
+
+    for (size_t i = 0; i < maxNeighbors_; ++i)
+    {
+      // 1) pos_x
+      low.push_back(-1000.0f);
+      high.push_back(1000.0f);
+      // 2) pos_y
+      low.push_back(-1000.0f);
+      high.push_back(1000.0f);
+
+      if (mode_ == ObsMode::Cartesian)
+      {
+        // 3) vel_x
+        low.push_back(-1000.0f);
+        high.push_back(1000.0f);
+        // 4) vel_y
+        low.push_back(-1000.0f);
+        high.push_back(1000.0f);
+        // 5) pref_x
+        low.push_back(-1000.0f);
+        high.push_back(1000.0f);
+        // 6) pref_y
+        low.push_back(-1000.0f);
+        high.push_back(1000.0f);
+      }
+      else
+      {
+        // 3) vel_mag ∈ [0,1]
+        low.push_back(0.0f);
+        high.push_back(1.0f);
+        // 4) vel_ang ∈ [−π,π)
+        low.push_back(-static_cast<float>(M_PI));
+        high.push_back(static_cast<float>(M_PI));
+        // 5) pref_mag ∈ [0,1]
+        low.push_back(0.0f);
+        high.push_back(1.0f);
+        // 6) pref_ang ∈ [−π,π)
+        low.push_back(-static_cast<float>(M_PI));
+        high.push_back(static_cast<float>(M_PI));
+      }
+
+      // 7) optional mask ∈ {0,1}
+      if (useObsMask_)
+      {
+        low.push_back(0.0f);
+        high.push_back(1.0f);
+      }
+    }
+
+    // human‐readable slice annotation
+    {
+      std::ostringstream oss;
+      oss << "[" << base << ":" << (base + maxNeighbors_ * feat_nbr)
+          << ") neighbors ×" << maxNeighbors_
+          << " ("
+          << (mode_ == ObsMode::Cartesian
                   ? "pos_x,pos_y,vel_x,vel_y,pref_x,pref_y"
                   : "pos_x,pos_y,vel_mag,vel_ang,pref_mag,pref_ang")
-            << ")";
-        info.push_back(oss.str());
-    }
-    idx = base + 6*maxNeighbors_;
-
-    // 5) neighbor mask
-    if (useObsMask_) {
-        low .insert(low.end(),  maxNeighbors_, 0.0f);
-        high.insert(high.end(), maxNeighbors_, 1.0f);
-        std::ostringstream oss;
-        oss << "[" << idx << ":" << (idx + maxNeighbors_)
-            << "] neighbor hit-mask ∈ {0,1}";
-        info.push_back(oss.str());
+          << (useObsMask_ ? ",mask)" : ")");
+      info.push_back(oss.str());
     }
 
-    // wrap into NumPy arrays (no extra copy)
-    auto low_arr  = pybind11::array_t<float>(low.size(),  low.data());
+    // ─────────────────────────────────────────────────────────────────────
+    // 6) pack into NumPy arrays and return dict
+    // ─────────────────────────────────────────────────────────────────────
+    auto low_arr = pybind11::array_t<float>(low.size(), low.data());
     auto high_arr = pybind11::array_t<float>(high.size(), high.data());
 
-    // return dict with mode, arrays, and human-readable info
     pybind11::dict d;
-    d["mode"]  = (mode_==ObsMode::Cartesian ? "cartesian" : "polar");
-    d["low"]   = low_arr;
-    d["high"]  = high_arr;
-    d["info"]  = info;  // vector<string> → Python list[str]
+    d["mode"] = (mode_ == ObsMode::Cartesian ? "cartesian" : "polar");
+    d["low"] = low_arr;
+    d["high"] = high_arr;
+    d["info"] = info; // vector<string> → Python list[str]
     return d;
-}  
+  }
 
   float RVO2_RL_Wrapper::getDistanceToGoal(size_t agent_id, bool normalized) const
   {
@@ -789,14 +884,14 @@ namespace RL_EXTENSIONS
     }
 
     float dx = dist_to_goal_vector_x_[agent_id];
-    float dy = dist_to_goal_vector_y_[agent_id];    
+    float dy = dist_to_goal_vector_y_[agent_id];
     float distance = std::sqrt(dx * dx + dy * dy);
 
     if (normalized)
     {
-      
-      float og_dx = goal_initial_vector_x_[agent_id] - agent_initial_pos_vector_x_[agent_id];      
-      float og_dy = goal_initial_vector_y_[agent_id] - agent_initial_pos_vector_y_[agent_id];      
+
+      float og_dx = goal_initial_vector_x_[agent_id] - agent_initial_pos_vector_x_[agent_id];
+      float og_dy = goal_initial_vector_y_[agent_id] - agent_initial_pos_vector_y_[agent_id];
       float og_distance = std::sqrt(og_dx * og_dx + og_dy * og_dy);
       if (og_distance > 0.0f)
       {
