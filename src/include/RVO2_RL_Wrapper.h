@@ -20,6 +20,7 @@ namespace RL_EXTENSIONS
   class RVO2_RL_Wrapper
   {
   private:
+    std::size_t stepcount_ = 0;
     std::unique_ptr<RayCastingEngine> rayCastingEngine_;
     std::vector<float> goal_initial_vector_x_; ///< SoA: x‐coords of goals
     std::vector<float> goal_initial_vector_y_;
@@ -78,6 +79,9 @@ namespace RL_EXTENSIONS
     size_t add_agent(const RVO::Vector2 &position);
 
     float getLidarRange() const;
+    void do_step();
+    std::size_t getStepCount();
+    void resetStepCount();
 
     std::vector<RVO::Vector2> getGoals() const;
     void setGoal(std::size_t agent_id, const RVO::Vector2 &goal);
@@ -86,8 +90,10 @@ namespace RL_EXTENSIONS
     void setCurrentGoalsAsInitialGoals();
     void setCurrentPositionsAsInitialPositions();
     void resetPositionAndGoalsToInit();
+    void setPreferredVelocity(int agent_id, RVO::Vector2 velocity);
     void setPreferredVelocities();
     void computeDistancesToGoal();
+    void computeDistanceToGoal(int agent_id);
     void computeAllAgentsPositions();
 
     void getRayCast(int agent_id, std::vector<float> &out_x, std::vector<float> &out_y) const;

@@ -89,7 +89,7 @@ void init_rvo2simulator(py::module &m)
          // getters: global / obstacles
          .def("get_global_time", &RVO::RVOSimulator::getGlobalTime)
          .def("get_time_step", &RVO::RVOSimulator::getTimeStep)
-         .def("get_time_step", &RVO::RVOSimulator::setTimeStep)
+         .def("set_time_step", &RVO::RVOSimulator::setTimeStep)
          .def("get_num_obstacle_vertices", &RVO::RVOSimulator::getNumObstacleVertices)
          .def("get_obstacle_vertex", &RVO::RVOSimulator::getObstacleVertex, py::arg("vertex_no"))
          .def("get_next_obstacle_vertex_no", &RVO::RVOSimulator::getNextObstacleVertexNo, py::arg("vertex_no"))

@@ -59,10 +59,15 @@ PYBIND11_MODULE(rvo2_rl, m)
                     // You can also bind any “always‐on” methods right here:
                     .def("set_preferred_velocities",
                          &RL_EXTENSIONS::RVO2_RL_Wrapper::setPreferredVelocities)
+                    .def("set_preferred_velocity",
+                         &RL_EXTENSIONS::RVO2_RL_Wrapper::setPreferredVelocity, py::arg("agent_id"), py::arg("velocity"))
                     .def("get_simulator",
                          static_cast<SimRef (W::*)()>(&W::getSimulator),
                          py::return_value_policy::reference_internal,
-                         "Returns the internal RVOSimulator (mutable)");
+                         "Returns the internal RVOSimulator (mutable)")
+                    .def("get_step_count", &RL_EXTENSIONS::RVO2_RL_Wrapper::getStepCount)
+                    .def("reset_step_count", &RL_EXTENSIONS::RVO2_RL_Wrapper::resetStepCount)
+                    .def("do_step", &RL_EXTENSIONS::RVO2_RL_Wrapper::do_step);
      bind_wrapper_general_purpose_functions(cls);
      bind_wrapper_goals(cls);
      bind_wrapper_observation(cls);
