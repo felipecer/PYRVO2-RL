@@ -21,6 +21,7 @@ namespace RL_EXTENSIONS
   {
   private:
     std::size_t stepcount_ = 0;
+    std::size_t max_step_count_ = 256;
     std::unique_ptr<RayCastingEngine> rayCastingEngine_;
     std::vector<float> goal_initial_vector_x_; ///< SoA: x‐coords of goals
     std::vector<float> goal_initial_vector_y_;
@@ -62,7 +63,8 @@ namespace RL_EXTENSIONS
         bool useObsMask = false,
         bool useLidar = false,
         std::size_t lidarCount = 360,
-        float lidarRange = 18.0f);
+        float lidarRange = 18.0f,
+        std::size_t max_step_count = 256);
     void initialize();
     RVO::RVOSimulator &getSimulator();
     const RVO::RVOSimulator &getSimulator() const;

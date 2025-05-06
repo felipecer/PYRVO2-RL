@@ -68,7 +68,8 @@ namespace RL_EXTENSIONS
       bool useObsMask,
       bool useLidar,
       std::size_t lidarCount,
-      float lidarRange)
+      float lidarRange,
+      std::size_t max_step_count)
       : rvo_simulator_{
             std::make_unique<RVO::RVOSimulator>(
                 timeStep,
@@ -81,6 +82,7 @@ namespace RL_EXTENSIONS
                 velocity)},
         mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}, useLidar_{useLidar}, lidarCount_{lidarCount}, lidarRange_{lidarRange}, maxNeighbors_{maxNeighbors}
   {
+    max_step_count_ = max_step_count;
     stepcount_ = 0;
     std::size_t n = rvo_simulator_->getNumAgents(); // típicamente 0 en este punto
     goal_vector_x_.assign(n, 0.0f);
@@ -767,9 +769,11 @@ namespace RL_EXTENSIONS
     // ─────────────────────────────────────────────────────────────────────
     // 1) step ∈ [0,1]
     // ─────────────────────────────────────────────────────────────────────
+    std::size_t max_step_count = max_step_count_;
     low.push_back(0.0f);
-    high.push_back(1.0f);
-    info.push_back("[0] step ∈ [0,1]");
+    high.push_back((float)max_step_count);
+    // info.push_back(std::to_string(max_step_count) + "]");
+    info.push_back("[0] step ∈ [0,"+std::to_string(max_step_count) + "]");
 
     // ─────────────────────────────────────────────────────────────────────
     // 2) dist_to_goal_x,y ∈ [-1,1]

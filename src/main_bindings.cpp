@@ -42,7 +42,7 @@ PYBIND11_MODULE(rvo2_rl, m)
                     // Expose its constructor signature:
                     .def(py::init<
                              float, float, size_t, float, float, float, float,
-                             const RVO::Vector2 &, RL_EXTENSIONS::ObsMode, bool, bool, size_t, float>(),
+                             const RVO::Vector2 &, RL_EXTENSIONS::ObsMode, bool, bool, size_t, float, size_t>(),
                          py::arg("time_step") = 0.25f,
                          py::arg("neighbor_dist") = 15.0f,
                          py::arg("max_neighbors") = 10,
@@ -55,7 +55,8 @@ PYBIND11_MODULE(rvo2_rl, m)
                          py::arg("use_obs_mask") = false,
                          py::arg("use_lidar") = false,
                          py::arg("lidar_count") = 360,
-                         py::arg("lidar_range") = 18.0f)
+                         py::arg("lidar_range") = 18.0f,
+                         py::arg("max_step_count") = 256)
                     // You can also bind any “always‐on” methods right here:
                     .def("set_preferred_velocities",
                          &RL_EXTENSIONS::RVO2_RL_Wrapper::setPreferredVelocities)

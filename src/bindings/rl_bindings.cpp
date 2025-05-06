@@ -90,7 +90,8 @@ void bind_wrapper_general_purpose_functions(py::class_<W> &cls)
               (agent_id, x, y, (vx, vy), (pvx, pvy), dist_to_goal)
 
           All agents are gathered in one C++ call, eliminating per‑agent overhead.
-          )doc");
+          )doc"); 
+  
 }
 
 void bind_wrapper_observation(py::class_<W> &cls)
@@ -141,7 +142,7 @@ void bind_wrapper_observation(py::class_<W> &cls)
                   using ssize = pybind11::ssize_t;
    
                   // 1) Always zero‐placeholder step
-                  float step = 0.0f;
+                  float step = w.getStepCount();
    
                   // 2) dist_to_goal_x,y
                   const auto &dxs = w.getDistToGoalsX();
@@ -253,3 +254,5 @@ void bind_wrapper_goals(py::class_<W> &cls)
         throw std::runtime_error(std::string("General error in get_distance_to_goal: ") + e.what());
     } }, py::arg("agent_id"), py::arg("normalized") = false, R"doc(Returns the distance from a specific agent to its goal. If `normalized` is True, the distance is normalized against the original distance.)doc");
 }
+
+
