@@ -10,11 +10,11 @@ using std::vector;
 namespace RL_EXTENSIONS
 {
   void RVO2_RL_Wrapper::initialize()
-  {    
+  {
     // Check if the simulator is initialized
     if (!rvo_simulator_)
     {
-      throw std::runtime_error("Simulator is not initialized.");      
+      throw std::runtime_error("Simulator is not initialized.");
     }
 
     // Ensure there are agents in the simulator
@@ -36,11 +36,27 @@ namespace RL_EXTENSIONS
       throw std::runtime_error("LIDAR is enabled, but the RayCastingEngine is not initialized.");
     }
 
+    // Print positions before computing distances
+    // pybind11::print("Positions before computing distances to goal (first 10 agents):");
+    // for (size_t i = 0; i < std::min<size_t>(2, rvo_simulator_->getNumAgents()); ++i)
+    // {
+    //   pybind11::print("Agent", i, "Position: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], ")");
+    // }
+
     // Set current positions and goals as initial values
     setCurrentPositionsAsInitialPositions();
     setCurrentGoalsAsInitialGoals();
+
     // Compute initial distances to goals
-    computeDistancesToGoal();        
+    computeDistancesToGoal();
+
+    // Print positions after computing distances
+    // pybind11::print("Positions after computing distances to goal (first 10 agents):");
+    // for (size_t i = 0; i < std::min<size_t>(2, rvo_simulator_->getNumAgents()); ++i)
+    // {
+    //   pybind11::print("Agent", i, "Distance to Goal: (", dist_to_goal_vector_x_[i], ",", dist_to_goal_vector_y_[i], ")");
+    //   pybind11::print("Agent", i, "Position: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], ")");
+    // }
   }
 
   // Return a mutable reference
@@ -147,10 +163,12 @@ namespace RL_EXTENSIONS
     else
       return 0.0f;
   }
-  void RVO2_RL_Wrapper::do_step() 
+  void RVO2_RL_Wrapper::do_step()
   {
     rvo_simulator_->doStep();
     stepcount_++;
+    computeAllAgentsPositions();
+    computeDistancesToGoal();
   };
 
   std::size_t RVO2_RL_Wrapper::getStepCount()
@@ -248,27 +266,26 @@ namespace RL_EXTENSIONS
     agent_pos_vector_y_.resize(m);
     for (size_t i = 0; i < m; ++i)
     {
+      // if (i == 0)
+      // {
+      //   pybind11::print("-------------------------RESET-------------------------");
+      //   pybind11::print("Current pos: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], "); Initial pos: (", agent_initial_pos_vector_x_[i], ",", agent_initial_pos_vector_y_[i], ")");
+      // }
       agent_pos_vector_x_[i] = agent_initial_pos_vector_x_[i];
       agent_pos_vector_y_[i] = agent_initial_pos_vector_y_[i];
+      rvo_simulator_->setAgentPosition(i, RVO::Vector2(agent_pos_vector_x_[i], agent_pos_vector_y_[i]));
     }
   }
 
   void RVO2_RL_Wrapper::setPreferredVelocity(int agent_id, RVO::Vector2 velocity)
   {
-    // pybind11::print("Set pref vel to: ", velocity.x(), ", ", velocity.y());
-    computeDistanceToGoal(agent_id);
     rvo_simulator_->setAgentPrefVelocity(agent_id, velocity);
   }
 
   void RVO2_RL_Wrapper::setPreferredVelocities()
   {
-    const int n = static_cast<int>(rvo_simulator_->getNumAgents());
-
-    // 1) Actualizar posiciones y direcciones
-    computeAllAgentsPositions();
-    computeDistancesToGoal(); // ← llena dir_x_ y dir_y_
-
-    // 2) Generar perturbaciones
+    const int n = static_cast<int>(rvo_simulator_->getNumAgents());   
+    
     std::vector<float> angles(n), dists(n);
     {
       std::mt19937 rng(std::random_device{}());
@@ -305,7 +322,7 @@ namespace RL_EXTENSIONS
 
   void RVO2_RL_Wrapper::computeDistancesToGoal()
   {
-    const int n = static_cast<int>(rvo_simulator_->getNumAgents());    
+    const int n = static_cast<int>(rvo_simulator_->getNumAgents());
     dist_to_goal_vector_x_.resize(n);
     dist_to_goal_vector_y_.resize(n);
 
@@ -314,32 +331,18 @@ namespace RL_EXTENSIONS
     {
       float dx = goal_vector_x_[i] - agent_pos_vector_x_[i];
       float dy = goal_vector_y_[i] - agent_pos_vector_y_[i];
-      // float sq = dx * dx + dy * dy;      
+      
       dist_to_goal_vector_x_[i] = dx;
       dist_to_goal_vector_y_[i] = dy;
-    }    
+    }
   }
 
   void RVO2_RL_Wrapper::computeDistanceToGoal(int agent_id)
   {
-    // pybind11::print("Computing distance to goal for agent_id: ", agent_id);
-    // pybind11::print("Agent position: (", agent_pos_vector_x_[agent_id], ", ", agent_pos_vector_y_[agent_id], ")");
-    // pybind11::print("Agent goal: (", goal_vector_x_[agent_id], ", ", goal_vector_y_[agent_id], ")");
-
     float dx = goal_vector_x_[agent_id] - agent_pos_vector_x_[agent_id];
-    float dy = goal_vector_y_[agent_id] - agent_pos_vector_y_[agent_id];
-
-    // pybind11::print("Delta X: ", dx, ", Delta Y: ", dy);
-
+    float dy = goal_vector_y_[agent_id] - agent_pos_vector_y_[agent_id];   
     dist_to_goal_vector_x_[agent_id] = dx;
     dist_to_goal_vector_y_[agent_id] = dy;
-
-    // pybind11::print("Updated distance to goal vectors: (", dist_to_goal_vector_x_[agent_id], ", ", dist_to_goal_vector_y_[agent_id], ")");
-  //   float dx = goal_vector_x_[agent_id] - agent_pos_vector_x_[agent_id];
-  //   float dy = goal_vector_y_[agent_id] - agent_pos_vector_y_[agent_id];
-  //   // float sq = dx * dx + dy * dy;      
-  //   dist_to_goal_vector_x_[agent_id] = dx;
-  //   dist_to_goal_vector_y_[agent_id] = dy;    
   }
 
   void RVO2_RL_Wrapper::computeAllAgentsPositions()
@@ -349,19 +352,10 @@ namespace RL_EXTENSIONS
     agent_pos_vector_y_.resize(n);
 
     for (int i = 0; i < n; ++i)
-    {      
-      auto p = rvo_simulator_->getAgentPosition(i);
-      // pybind11::print("-------------------------------");
-      // pybind11::print("------- Agent number: ", i, " -------");
-      // pybind11::print("-------------------------------");
-      // pybind11::print("current agent position: ", agent_pos_vector_x_[i], ", ", agent_pos_vector_y_[i]);
-      // pybind11::print("new agent position: ", p.x(), ", ", p.y());
+    {
+      auto p = rvo_simulator_->getAgentPosition(i);      
       agent_pos_vector_x_[i] = p.x();
-      agent_pos_vector_y_[i] = p.y();
-      // pybind11::print("updated agent position: ", agent_pos_vector_x_[i], ", ", agent_pos_vector_y_[i]);
-      // pybind11::print("-------------------------------");
-      // pybind11::print("-------------------------------");
-      // pybind11::print("-------------------------------");
+      agent_pos_vector_y_[i] = p.y();      
     }
   }
 
@@ -773,7 +767,7 @@ namespace RL_EXTENSIONS
     low.push_back(0.0f);
     high.push_back((float)max_step_count);
     // info.push_back(std::to_string(max_step_count) + "]");
-    info.push_back("[0] step ∈ [0,"+std::to_string(max_step_count) + "]");
+    info.push_back("[0] step ∈ [0," + std::to_string(max_step_count) + "]");
 
     // ─────────────────────────────────────────────────────────────────────
     // 2) dist_to_goal_x,y ∈ [-1,1]
@@ -915,10 +909,10 @@ namespace RL_EXTENSIONS
     if (agent_id >= dist_to_goal_vector_x_.size())
     {
       throw std::out_of_range("getDistanceToGoal: agent_id out of range");
-    }       
-    float dx = dist_to_goal_vector_x_[agent_id];    
-    float dy = dist_to_goal_vector_y_[agent_id];    
-    float distance = std::sqrt(dx * dx + dy * dy);    
+    }
+    float dx = dist_to_goal_vector_x_[agent_id];
+    float dy = dist_to_goal_vector_y_[agent_id];
+    float distance = std::sqrt(dx * dx + dy * dy);
     // pybind11::print("get_distance_to_goal: ", distance);
     if (normalized)
     {
