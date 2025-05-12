@@ -20,6 +20,8 @@ namespace RL_EXTENSIONS
   class RVO2_RL_Wrapper
   {
   private:
+    float neighbor_dist_ = 5.0f;
+    float max_speed_ = 2.0f;
     std::size_t stepcount_ = 0;
     std::size_t max_step_count_ = 256;
     std::unique_ptr<RayCastingEngine> rayCastingEngine_;

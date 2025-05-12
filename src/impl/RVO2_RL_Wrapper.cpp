@@ -36,27 +36,12 @@ namespace RL_EXTENSIONS
       throw std::runtime_error("LIDAR is enabled, but the RayCastingEngine is not initialized.");
     }
 
-    // Print positions before computing distances
-    // pybind11::print("Positions before computing distances to goal (first 10 agents):");
-    // for (size_t i = 0; i < std::min<size_t>(2, rvo_simulator_->getNumAgents()); ++i)
-    // {
-    //   pybind11::print("Agent", i, "Position: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], ")");
-    // }
-
     // Set current positions and goals as initial values
     setCurrentPositionsAsInitialPositions();
     setCurrentGoalsAsInitialGoals();
 
     // Compute initial distances to goals
     computeDistancesToGoal();
-
-    // Print positions after computing distances
-    // pybind11::print("Positions after computing distances to goal (first 10 agents):");
-    // for (size_t i = 0; i < std::min<size_t>(2, rvo_simulator_->getNumAgents()); ++i)
-    // {
-    //   pybind11::print("Agent", i, "Distance to Goal: (", dist_to_goal_vector_x_[i], ",", dist_to_goal_vector_y_[i], ")");
-    //   pybind11::print("Agent", i, "Position: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], ")");
-    // }
   }
 
   // Return a mutable reference
@@ -98,6 +83,7 @@ namespace RL_EXTENSIONS
                 velocity)},
         mode_{mode}, useObsMask_{useObsMask}, rayCastingEngine_{nullptr}, useLidar_{useLidar}, lidarCount_{lidarCount}, lidarRange_{lidarRange}, maxNeighbors_{maxNeighbors}
   {
+    neighbor_dist_ = neighborDist;
     max_step_count_ = max_step_count;
     stepcount_ = 0;
     std::size_t n = rvo_simulator_->getNumAgents(); // típicamente 0 en este punto
@@ -112,6 +98,7 @@ namespace RL_EXTENSIONS
     dist_to_goal_vector_x_.assign(n, 0.0f);
     dist_to_goal_vector_y_.assign(n, 0.0f);
     agent_behaviors_.assign(n, "");
+    max_speed_ = maxSpeed;
     if (useLidar_)
     {
       rayCastingEngine_ = std::make_unique<RayCastingEngine>(lidarCount_, lidarRange_);
@@ -266,11 +253,6 @@ namespace RL_EXTENSIONS
     agent_pos_vector_y_.resize(m);
     for (size_t i = 0; i < m; ++i)
     {
-      // if (i == 0)
-      // {
-      //   pybind11::print("-------------------------RESET-------------------------");
-      //   pybind11::print("Current pos: (", agent_pos_vector_x_[i], ",", agent_pos_vector_y_[i], "); Initial pos: (", agent_initial_pos_vector_x_[i], ",", agent_initial_pos_vector_y_[i], ")");
-      // }
       agent_pos_vector_x_[i] = agent_initial_pos_vector_x_[i];
       agent_pos_vector_y_[i] = agent_initial_pos_vector_y_[i];
       rvo_simulator_->setAgentPosition(i, RVO::Vector2(agent_pos_vector_x_[i], agent_pos_vector_y_[i]));
@@ -279,13 +261,21 @@ namespace RL_EXTENSIONS
 
   void RVO2_RL_Wrapper::setPreferredVelocity(int agent_id, RVO::Vector2 velocity)
   {
+    // auto prefVel = rvo_simulator_->getAgentPrefVelocity(0);
+    // auto newPrefVel = prefVel + velocity;
+    // rvo_simulator_->setAgentPrefVelocity(agent_id, newPrefVel);
     rvo_simulator_->setAgentPrefVelocity(agent_id, velocity);
   }
 
   void RVO2_RL_Wrapper::setPreferredVelocities()
   {
-    const int n = static_cast<int>(rvo_simulator_->getNumAgents());   
-    
+    const int n = static_cast<int>(rvo_simulator_->getNumAgents());
+
+    // 1) Update positions and directions
+    computeAllAgentsPositions();
+    computeDistancesToGoal();
+
+    // 2) Generate perturbations
     std::vector<float> angles(n), dists(n);
     {
       std::mt19937 rng(std::random_device{}());
@@ -300,7 +290,7 @@ namespace RL_EXTENSIONS
 
     std::vector<float> vx(n), vy(n);
 
-// Paso 1: cálculo SIMD de velocidades preferidas
+    // Step 1: SIMD calculation of preferred velocities with speed scaling
 #pragma omp simd
     for (int i = 0; i < n; ++i)
     {
@@ -308,11 +298,26 @@ namespace RL_EXTENSIONS
       float dist = dists[i];
       float px = std::cos(angle);
       float py = std::sin(angle);
-      vx[i] = dist_to_goal_vector_x_[i] + px * dist;
-      vy[i] = dist_to_goal_vector_y_[i] + py * dist;
+
+      // Get direction to goal
+      float dx = dist_to_goal_vector_x_[i];
+      float dy = dist_to_goal_vector_y_[i];
+
+      // Normalize direction vector if non-zero
+      float len = std::sqrt(dx * dx + dy * dy);
+      if (len > 1e-6f)
+      {
+        dx /= len;
+        dy /= len;
+      }
+
+      // Scale by agent's max speed and add small random perturbation
+      float maxSpeed = rvo_simulator_->getAgentMaxSpeed(i);
+      vx[i] = dx * maxSpeed + px * dist;
+      vy[i] = dy * maxSpeed + py * dist;
     }
 
-// Paso 2: aplicar resultados (sec. o paralelo si quieres)
+    // Step 2: Apply results (sequential or parallel)
 #pragma omp parallel for
     for (int i = 0; i < n; ++i)
     {
@@ -331,7 +336,7 @@ namespace RL_EXTENSIONS
     {
       float dx = goal_vector_x_[i] - agent_pos_vector_x_[i];
       float dy = goal_vector_y_[i] - agent_pos_vector_y_[i];
-      
+
       dist_to_goal_vector_x_[i] = dx;
       dist_to_goal_vector_y_[i] = dy;
     }
@@ -340,7 +345,7 @@ namespace RL_EXTENSIONS
   void RVO2_RL_Wrapper::computeDistanceToGoal(int agent_id)
   {
     float dx = goal_vector_x_[agent_id] - agent_pos_vector_x_[agent_id];
-    float dy = goal_vector_y_[agent_id] - agent_pos_vector_y_[agent_id];   
+    float dy = goal_vector_y_[agent_id] - agent_pos_vector_y_[agent_id];
     dist_to_goal_vector_x_[agent_id] = dx;
     dist_to_goal_vector_y_[agent_id] = dy;
   }
@@ -353,9 +358,9 @@ namespace RL_EXTENSIONS
 
     for (int i = 0; i < n; ++i)
     {
-      auto p = rvo_simulator_->getAgentPosition(i);      
+      auto p = rvo_simulator_->getAgentPosition(i);
       agent_pos_vector_x_[i] = p.x();
-      agent_pos_vector_y_[i] = p.y();      
+      agent_pos_vector_y_[i] = p.y();
     }
   }
 
@@ -494,11 +499,12 @@ namespace RL_EXTENSIONS
 
   pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsPolar(int agent_id) const
   {
+    auto curPosMainAgent = rvo_simulator_->getAgentPosition(agent_id);
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
     size_t n = rvo_simulator_->getAgentNumAgentNeighbors(agent_id);
-
+    float max_dist_neighbors = neighbor_dist_;
     // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
-    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(6)});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(4)});
     auto buf = arr.mutable_unchecked<2>();
 #pragma omp simd
     for (size_t i = 0; i < n; ++i)
@@ -506,43 +512,35 @@ namespace RL_EXTENSIONS
       size_t nbrId = rvo_simulator_->getAgentAgentNeighbor(agent_id, i);
       auto pos = rvo_simulator_->getAgentPosition(nbrId);
       auto vel = rvo_simulator_->getAgentVelocity(nbrId);
-      auto pref = rvo_simulator_->getAgentPrefVelocity(nbrId);
       float vx = vel.x(), vy = vel.y();
       float vel_mag = std::sqrt(vx * vx + vy * vy);
       float vel_angle = (vx == 0.0f && vy == 0.0f) ? 0.0f : std::atan2(vy, vx);
-      float pvx = pref.x(), pvy = pref.y();
-      float pv_mag = std::sqrt(pvx * pvx + pvy * pvy);
-      float pv_angle = (pvx == 0.0f && pvy == 0.0f) ? 0.0f : std::atan2(pvy, pvx);
-      buf(i, 0) = pos.x();
-      buf(i, 1) = pos.y();
+      buf(i, 0) = (pos.x() - curPosMainAgent.x())/max_dist_neighbors;
+      buf(i, 1) = (pos.y() - curPosMainAgent.y())/max_dist_neighbors;
       buf(i, 2) = vel_mag;
       buf(i, 3) = vel_angle;
-      buf(i, 4) = pv_mag;
-      buf(i, 5) = pv_angle;
     }
 #pragma omp simd
     for (size_t i = n; i < maxNeighbors; ++i)
     {
-      buf(i, 0) = -999.0f; // pos_x invalid
-      buf(i, 1) = -999.0f; // pos_y invalid
-      buf(i, 2) = 0.0f;    // vel_mag
-      buf(i, 3) = 0.0f;    // vel_angle
-      buf(i, 4) = 0.0f;    // pref_vel_mag
-      buf(i, 5) = 0.0f;    // pref_vel_angle
+      buf(i, 0) = -2.0f; // pos_x invalid
+      buf(i, 1) = -2.0f; // pos_y invalid
+      buf(i, 2) = 0.0f;   // vel_mag
+      buf(i, 3) = 0.0f;   // vel_angle
     }
     return arr;
   }
 
   pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsCartesian(int agent_id) const
   {
+    auto curPosMainAgent = rvo_simulator_->getAgentPosition(agent_id);
     // Get maximum number of neighbors and the current active neighbor count
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
     size_t n = rvo_simulator_->getAgentNumAgentNeighbors(agent_id);
-
-    // Create a NumPy array of shape (maxNeighbors, 6)
+    float max_dist_neighbors = neighbor_dist_;
+    // Create a NumPy array of shape (maxNeighbors, 4)
     // Columns: pos_x, pos_y, vel_x, vel_y, pref_vel_x, pref_vel_y
-    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 6});
-    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(6)});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(4)});
     // Access the buffer without bounds checking for maximum performance
     auto buf = arr.mutable_unchecked<2>();
 
@@ -554,26 +552,21 @@ namespace RL_EXTENSIONS
       size_t nbrId = rvo_simulator_->getAgentAgentNeighbor(agent_id, i);
       auto pos = rvo_simulator_->getAgentPosition(nbrId);
       auto vel = rvo_simulator_->getAgentVelocity(nbrId);
-      auto pref = rvo_simulator_->getAgentPrefVelocity(nbrId);
 
       // Write position, velocity, and preferred velocity data
-      buf(i, 0) = pos.x();  // x-coordinate
-      buf(i, 1) = pos.y();  // y-coordinate
-      buf(i, 2) = vel.x();  // velocity x-component
-      buf(i, 3) = vel.y();  // velocity y-component
-      buf(i, 4) = pref.x(); // preferred velocity x-component
-      buf(i, 5) = pref.y(); // preferred velocity y-component
+      buf(i, 0) = (pos.x() - curPosMainAgent.x())/max_dist_neighbors; // x-coordinate
+      buf(i, 1) = (pos.y() - curPosMainAgent.y())/max_dist_neighbors; // y-coordinate
+      buf(i, 2) = vel.x();                       // velocity x-component
+      buf(i, 3) = vel.y();                       // velocity y-component
     }
 #pragma omp simd
     // Pad remaining rows with an invalid position and zero velocities
     for (size_t i = n; i < maxNeighbors; ++i)
     {
-      buf(i, 0) = -999.0f; // invalid pos_x
-      buf(i, 1) = -999.0f; // invalid pos_y
-      buf(i, 2) = 0.0f;    // vel_x
-      buf(i, 3) = 0.0f;    // vel_y
-      buf(i, 4) = 0.0f;    // pref_vel_x
-      buf(i, 5) = 0.0f;    // pref_vel_y
+      buf(i, 0) = -2.0f; // invalid pos_x
+      buf(i, 1) = -2.0f; // invalid pos_y
+      buf(i, 2) = 0.0f;   // vel_x
+      buf(i, 3) = 0.0f;   // vel_y
     }
 
     // Return the NumPy array to Python
@@ -582,14 +575,14 @@ namespace RL_EXTENSIONS
 
   pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsPolarWithMask(int agent_id) const
   {
+    auto curPosMainAgent = rvo_simulator_->getAgentPosition(agent_id);
     // Maximum neighbors and active neighbor count
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
     size_t n = rvo_simulator_->getAgentNumAgentNeighbors(agent_id);
-
+    float max_dist_neighbors = neighbor_dist_;
     // Create a single NumPy array with shape (maxNeighbors, 7)
     // Columns: pos_x, pos_y, vel_mag, vel_angle, pref_vel_mag, pref_vel_angle, mask
-    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
-    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(7)});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(5)});
     auto buf = arr.mutable_unchecked<2>();
 
 // Fill data and mask for actual neighbors
@@ -599,41 +592,30 @@ namespace RL_EXTENSIONS
       size_t nbr = rvo_simulator_->getAgentAgentNeighbor(agent_id, i);
       auto pos = rvo_simulator_->getAgentPosition(nbr);
       auto vel = rvo_simulator_->getAgentVelocity(nbr);
-      auto pref = rvo_simulator_->getAgentPrefVelocity(nbr);
 
       // Compute magnitude and angle of velocity
       float vx = vel.x(), vy = vel.y();
       float mag = std::sqrt(vx * vx + vy * vy);
       float ang = (vx == 0.0f && vy == 0.0f) ? 0.0f : std::atan2(vy, vx);
 
-      // Compute magnitude and angle of preferred velocity
-      float pvx = pref.x(), pvy = pref.y();
-      float pmag = std::sqrt(pvx * pvx + pvy * pvy);
-      float pang = (pvx == 0.0f && pvy == 0.0f) ? 0.0f : std::atan2(pvy, pvx);
-
       // Write into buffer
-      buf(i, 0) = pos.x();
-      buf(i, 1) = pos.y();
+      buf(i, 0) = (pos.x() - curPosMainAgent.x())/max_dist_neighbors;;
+      buf(i, 1) = (pos.y() - curPosMainAgent.y())/max_dist_neighbors;;
       buf(i, 2) = mag;
       buf(i, 3) = ang;
-      buf(i, 4) = pmag;
-      buf(i, 5) = pang;
-      buf(i, 6) = 1.0f; // valid neighbor mask
+      buf(i, 4) = 1.0f; // valid neighbor mask
     }
 
 // Pad remaining entries with invalid/zero values and mask=0
 #pragma omp simd
     for (size_t i = n; i < maxNeighbors; ++i)
     {
-      buf(i, 0) = -999.0f; // invalid position x
-      buf(i, 1) = -999.0f; // invalid position y
-      buf(i, 2) = 0.0f;    // zero velocity magnitude
-      buf(i, 3) = 0.0f;    // zero velocity angle
-      buf(i, 4) = 0.0f;    // zero preferred vel magnitude
-      buf(i, 5) = 0.0f;    // zero preferred vel angle
-      buf(i, 6) = 0.0f;    // padding mask
+      buf(i, 0) = -2.0f; // invalid position x
+      buf(i, 1) = -2.0f; // invalid position y
+      buf(i, 2) = 0.0f;   // zero velocity magnitude
+      buf(i, 3) = 0.0f;   // zero velocity angle
+      buf(i, 4) = 0.0f;   // invalid neighbor mask
     }
-
     return arr;
   }
 
@@ -642,14 +624,14 @@ namespace RL_EXTENSIONS
   // [pos_x, pos_y, vel_x, vel_y, pref_vel_x, pref_vel_y, valid_mask]
   pybind11::array_t<float> RVO2_RL_Wrapper::getNeighborsObsCartesianWithMask(int agent_id) const
   {
+    auto curPosMainAgent = rvo_simulator_->getAgentPosition(agent_id);
     // Retrieve maximum neighbors and active neighbor count
     size_t maxNeighbors = rvo_simulator_->getAgentMaxNeighbors(agent_id);
     size_t n = rvo_simulator_->getAgentNumAgentNeighbors(agent_id);
-
+    float max_dist_neighbors = neighbor_dist_;
     // Create a NumPy array of shape (maxNeighbors, 7)
     // Last column is mask: 1.0 for valid neighbor, 0.0 for padding
-    // pybind11::array_t<float> arr({(pybind11::ssize_t)maxNeighbors, 7});
-    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(7)});
+    pybind11::array_t<float> arr({static_cast<pybind11::ssize_t>(maxNeighbors), static_cast<pybind11::ssize_t>(5)});
     auto buf = arr.mutable_unchecked<2>(); // fast unchecked access
 
 // Populate actual neighbor entries
@@ -660,31 +642,24 @@ namespace RL_EXTENSIONS
       size_t nbrId = rvo_simulator_->getAgentAgentNeighbor(agent_id, i);
       auto pos = rvo_simulator_->getAgentPosition(nbrId);
       auto vel = rvo_simulator_->getAgentVelocity(nbrId);
-      auto pref = rvo_simulator_->getAgentPrefVelocity(nbrId);
 
       // Fill position and velocity components
-      buf(i, 0) = pos.x();  // x-coordinate
-      buf(i, 1) = pos.y();  // y-coordinate
-      buf(i, 2) = vel.x();  // velocity x-component
-      buf(i, 3) = vel.y();  // velocity y-component
-      buf(i, 4) = pref.x(); // preferred velocity x-component
-      buf(i, 5) = pref.y(); // preferred velocity y-component
-
-      // Mark as valid neighbor
-      buf(i, 6) = 1.0f;
+      buf(i, 0) = (pos.x() - curPosMainAgent.x())/max_dist_neighbors; // x-coordinate
+      buf(i, 1) = (pos.y() - curPosMainAgent.y())/max_dist_neighbors; // y-coordinate
+      buf(i, 2) = vel.x();                       // velocity x-component
+      buf(i, 3) = vel.y();                       // velocity y-component
+      buf(i, 4) = 1.0f;
     }
 
 // Pad remaining rows with invalid markers and zero motion
 #pragma omp simd
     for (size_t i = n; i < maxNeighbors; ++i)
     {
-      buf(i, 0) = -999.0f; // invalid pos_x
-      buf(i, 1) = -999.0f; // invalid pos_y
-      buf(i, 2) = 0.0f;    // vel_x
-      buf(i, 3) = 0.0f;    // vel_y
-      buf(i, 4) = 0.0f;    // pref_vel_x
-      buf(i, 5) = 0.0f;    // pref_vel_y
-      buf(i, 6) = 0.0f;    // mask indicating padding
+      buf(i, 0) = -2.0f; // invalid pos_x
+      buf(i, 1) = -2.0f; // invalid pos_y
+      buf(i, 2) = 0.0f;   // vel_x
+      buf(i, 3) = 0.0f;   // vel_y
+      buf(i, 4) = 0.0f;   // mask invalid
     }
 
     // Return the combined data+mask array
@@ -820,51 +795,40 @@ namespace RL_EXTENSIONS
 
     // ─────────────────────────────────────────────────────────────────────
     // 4) neighbor block: [features + optional mask] * maxNeighbors_
-    //    Cartesian fields:    pos_x,  pos_y,  vel_x,  vel_y,  pref_x,  pref_y
-    //    Polar    fields:    pos_x,  pos_y,  vel_mag,vel_ang,pref_mag,pref_ang
+    //    Cartesian fields:    pos_x,  pos_y,  vel_x,  vel_y
+    //    Polar    fields:    pos_x,  pos_y,  vel_mag,vel_ang
     // ─────────────────────────────────────────────────────────────────────
     const size_t base = low.size();
-    const size_t feat_nbr = 6 + (useObsMask_ ? 1 : 0); // per‐neighbor column count
+    const size_t feat_nbr = 4 + (useObsMask_ ? 1 : 0); // per‐neighbor column count
     // Pre‑reserve to avoid reallocations
     low.reserve(base + maxNeighbors_ * feat_nbr);
     high.reserve(base + maxNeighbors_ * feat_nbr);
-
+    float max_speed = max_speed_;
+    
     for (size_t i = 0; i < maxNeighbors_; ++i)
     {
       // 1) pos_x
-      low.push_back(-1000.0f);
-      high.push_back(1000.0f);
+      low.push_back(-2.0f);
+      high.push_back(2.0f);
       // 2) pos_y
-      low.push_back(-1000.0f);
-      high.push_back(1000.0f);
+      low.push_back(-2.0f);
+      high.push_back(2.0f);
 
       if (mode_ == ObsMode::Cartesian)
       {
         // 3) vel_x
-        low.push_back(-1000.0f);
-        high.push_back(1000.0f);
+        low.push_back(-max_speed);
+        high.push_back(max_speed);
         // 4) vel_y
-        low.push_back(-1000.0f);
-        high.push_back(1000.0f);
-        // 5) pref_x
-        low.push_back(-1000.0f);
-        high.push_back(1000.0f);
-        // 6) pref_y
-        low.push_back(-1000.0f);
-        high.push_back(1000.0f);
+        low.push_back(-max_speed);
+        high.push_back(max_speed);
       }
       else
       {
         // 3) vel_mag ∈ [0,1]
         low.push_back(0.0f);
-        high.push_back(1.0f);
+        high.push_back(max_speed);
         // 4) vel_ang ∈ [−π,π)
-        low.push_back(-static_cast<float>(M_PI));
-        high.push_back(static_cast<float>(M_PI));
-        // 5) pref_mag ∈ [0,1]
-        low.push_back(0.0f);
-        high.push_back(1.0f);
-        // 6) pref_ang ∈ [−π,π)
         low.push_back(-static_cast<float>(M_PI));
         high.push_back(static_cast<float>(M_PI));
       }
@@ -884,8 +848,8 @@ namespace RL_EXTENSIONS
           << ") neighbors ×" << maxNeighbors_
           << " ("
           << (mode_ == ObsMode::Cartesian
-                  ? "pos_x,pos_y,vel_x,vel_y,pref_x,pref_y"
-                  : "pos_x,pos_y,vel_mag,vel_ang,pref_mag,pref_ang")
+                  ? "pos_x,pos_y,vel_x,vel_y"
+                  : "pos_x,pos_y,vel_mag,vel_ang")
           << (useObsMask_ ? ",mask)" : ")");
       info.push_back(oss.str());
     }
