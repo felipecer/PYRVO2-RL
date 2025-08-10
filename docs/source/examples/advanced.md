@@ -353,8 +353,11 @@ class AdaptiveAgent:
         """Assess danger level based on neighbor proximity and velocities."""
         danger = 0.0
         
+        # Check if masks are enabled by examining data structure
+        has_mask = neighbors.shape[1] == 7  # 7 columns means mask is included
+        
         for i in range(neighbors.shape[0]):
-            if self.wrapper.isUsingObsMask() and neighbors[i][-1] < 0.5:
+            if has_mask and neighbors[i][-1] < 0.5:
                 continue  # Invalid neighbor
             
             pos_x, pos_y = neighbors[i][0], neighbors[i][1]

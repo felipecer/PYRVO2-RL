@@ -165,7 +165,7 @@ def get_observation(self, agent_id: int) -> np.ndarray:
         RuntimeError: If simulation not initialized
     """
 
-def get_observation_bounds(self) -> Dict[str, Any]:
+def get_observation_limits(self) -> Dict[str, Any]:
     """Get observation space bounds and structure information.
     
     Returns:
@@ -393,10 +393,10 @@ The complete observation vector is structured as follows:
 
 ### Observation Bounds
 
-Use `get_observation_bounds()` to get the exact structure:
+Use `get_observation_limits()` to get the exact structure:
 
 ```python
-bounds = wrapper.get_observation_bounds()
+bounds = wrapper.get_observation_limits()
 
 print("Observation mode:", bounds["mode"])
 print("Observation size:", len(bounds["low"]))

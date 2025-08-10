@@ -9,9 +9,37 @@ The most basic scenario: two agents exchanging positions.
 ```python
 import rvo2_rl
 from rvo2_rl.rl import RVO2RLWrapper, ObsMode
-from rvo2_rl.rvo2 import Vector2
-
-# Create wrapper
+from rvo2_rl.rvo2 import Vector2        print(f"Step {step} - Agent 0 observation:")
+        print(f"  Full observation shape: {obs.shape}")
+        print(f"  First 10 values: {obs[:10]}")
+        
+        # Break down the observation components
+        step_count = obs[0]
+        dist_goal_x, dist_goal_y = obs[1], obs[2]
+        
+        print(f"  Step count: {step_count}")
+        print(f"  Distance to goal: ({dist_goal_x:.3f}, {dist_goal_y:.3f})")
+        
+        # Get neighbor data separately for detailed analysis
+        neighbors = wrapper.get_neighbors(0)
+        print(f"  Neighbors array shape: {neighbors.shape}")
+        
+        # Check if masks are enabled by examining neighbor data structure
+        has_mask = neighbors.shape[1] == 7  # 7 columns means mask is included
+        
+        print(f"  Neighbors (first 2 rows):")
+        for i in range(min(2, neighbors.shape[0])):
+            if has_mask:
+                pos_x, pos_y, vel_x, vel_y, pv_x, pv_y, mask = neighbors[i]
+                valid = "valid" if mask > 0.5 else "padded"
+                print(f"    Neighbor {i}: pos=({pos_x:.2f}, {pos_y:.2f}), "
+                      f"vel=({vel_x:.2f}, {vel_y:.2f}), mask={mask:.0f} ({valid})")
+            else:
+                pos_x, pos_y, vel_x, vel_y, pv_x, pv_y = neighbors[i]
+                print(f"    Neighbor {i}: pos=({pos_x:.2f}, {pos_y:.2f}), "
+                      f"vel=({vel_x:.2f}, {vel_y:.2f})")
+        
+        print()er
 wrapper = RVO2RLWrapper(
     time_step=0.25,
     neighbor_dist=10.0,
@@ -306,7 +334,7 @@ def analyze_observations():
     print("=" * 40)
     
     # Get observation structure information
-    bounds = wrapper.get_observation_bounds()
+    bounds = wrapper.get_observation_limits()
     
     print(f"Observation mode: {bounds['mode']}")
     print(f"Observation size: {len(bounds['low'])}")
@@ -330,19 +358,13 @@ def analyze_observations():
         print(f"  Full observation shape: {obs.shape}")
         print(f"  First 10 values: {obs[:10]}")
         
-        # Break down the observation components
-        step_count = obs[0]
-        dist_goal_x, dist_goal_y = obs[1], obs[2]
-        
-        print(f"  Step count: {step_count}")
-        print(f"  Distance to goal: ({dist_goal_x:.3f}, {dist_goal_y:.3f})")
-        
-        # Get neighbor data separately for detailed analysis
+        # Check if masks are enabled by examining neighbor data structure
         neighbors = wrapper.get_neighbors(0)
-        print(f"  Neighbors array shape: {neighbors.shape}")
+        has_mask = neighbors.shape[1] == 7  # 7 columns means mask is included
+        
         print(f"  Neighbors (first 2 rows):")
         for i in range(min(2, neighbors.shape[0])):
-            if wrapper.isUsingObsMask():
+            if has_mask:
                 pos_x, pos_y, vel_x, vel_y, pv_x, pv_y, mask = neighbors[i]
                 valid = "valid" if mask > 0.5 else "padded"
                 print(f"    Neighbor {i}: pos=({pos_x:.2f}, {pos_y:.2f}), "
@@ -432,7 +454,7 @@ class MultiAgentNavigationEnv(gym.Env):
     def _setup_spaces(self):
         """Define observation and action spaces."""
         # Get observation bounds from wrapper
-        bounds = self.wrapper.get_observation_bounds()
+        bounds = self.wrapper.get_observation_limits()
         obs_low = np.array(bounds["low"], dtype=np.float32)
         obs_high = np.array(bounds["high"], dtype=np.float32)
         
@@ -584,7 +606,7 @@ test_custom_environment()
 ## Key Takeaways
 
 1. **Start Simple**: Begin with basic two-agent scenarios before scaling up
-2. **Observation Structure**: Use `get_observation_bounds()` to understand the observation layout
+2. **Observation Structure**: Use `get_observation_limits()` to understand the observation layout
 3. **Action Integration**: Apply RL actions via `set_preferred_velocity()` 
 4. **Environment Wrapping**: Create Gymnasium environments for standard RL training
 5. **Parameter Tuning**: Adjust `neighbor_dist`, `max_neighbors`, and `time_step` for your use case

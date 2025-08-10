@@ -210,9 +210,10 @@ class SwarmController:
         neighbor_count = 0
         leader_count = 0
         
-        # Process neighbors
+        # Process neighbors - check if masks are enabled by data structure
+        has_mask = neighbors.shape[1] == 7  # 7 columns means mask is included
         for i in range(neighbors.shape[0]):
-            if wrapper.isUsingObsMask():
+            if has_mask:
                 pos_x, pos_y, vel_x, vel_y, pv_x, pv_y, mask = neighbors[i]
                 if mask < 0.5:  # Invalid neighbor
                     continue

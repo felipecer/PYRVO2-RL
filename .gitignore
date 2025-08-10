@@ -70,4 +70,7 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 
+# Documentation testing project (not version controlled)
+doc_testing_project/
+
 vec_report.txt
