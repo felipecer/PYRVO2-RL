@@ -26,6 +26,7 @@ wheels/
 venv/
 env/
 .venv/
+pyrvo2_docs_env/
 
 # PyBind11 / setuptools build directories
 *.egg-info/
